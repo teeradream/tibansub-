@@ -1,0 +1,211 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-parcelize'
+apply plugin: 'kotlin-kapt'
+
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+def rootCMakeLists = "../CMakeLists.txt"
+def rootCMakeListsContent = file(rootCMakeLists).text
+static def grepVersionComponent(content, varname) {
+    def match = content =~ /set\($varname ([0-9]+)\)/
+    if(!match.find())
+        throw new GradleException("Failed to find $varname in CMakeLists.txt")
+    return match.group(1)
+}
+def chiakiVersionMajor = grepVersionComponent(rootCMakeListsContent, "CHIAKI_VERSION_MAJOR")
+def chiakiVersionMinor = grepVersionComponent(rootCMakeListsContent, "CHIAKI_VERSION_MINOR")
+def chiakiVersionPatch = grepVersionComponent(rootCMakeListsContent, "CHIAKI_VERSION_PATCH")
+def chiakiVersion = "$chiakiVersionMajor.$chiakiVersionMinor.$chiakiVersionPatch"
+println("TIBANSUB Backend Chiaki Engine Version: $chiakiVersion")
+
+android {
+    compileSdkVersion 34
+    defaultConfig {
+        applicationId "com.tibansub.app"
+        minSdkVersion 26
+        targetSdkVersion 33
+        versionCode 100
+        versionName "1.0.0"
+        if (!project.hasProperty("skipNativeCmake")) {
+            externalNativeBuild {
+                cmake {
+                    arguments "-DCHIAKI_ENABLE_TESTS=OFF",
+                            "-DCHIAKI_ENABLE_CLI=OFF",
+                            "-DCHIAKI_ENABLE_GUI=OFF",
+                            "-DCHIAKI_ENABLE_SETSU=OFF",
+                            "-DCHIAKI_ENABLE_ANDROID=ON",
+                            "-DCHIAKI_ENABLE_FFMPEG_DECODER=OFF",
+                            "-DCHIAKI_ENABLE_PI_DECODER=OFF",
+                            "-DCHIAKI_LIB_ENABLE_OPUS=OFF",
+                            "-DCHIAKI_LIB_OPENSSL_EXTERNAL_PROJECT=ON"
+                }
+            }
+        }
+    }
+    buildFeatures {
+        viewBinding true
+        compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion "1.4.8"
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            excludes += 'META-INF/versions/9/OSGI-INF/MANIFEST.MF'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+    if (!project.hasProperty("skipNativeCmake")) {
+        externalNativeBuild {
+            cmake {
+                version "3.22.1"
+                path rootCMakeLists
+            }
+        }
+    }
+    signingConfigs {
+        release
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    Properties properties = new Properties()
+    def propertiesFile = file("../local.properties")
+    if (propertiesFile.exists()) {
+        properties.load(propertiesFile.newDataInputStream())
+    }
+
+    if(properties.containsKey("chiakiKeystore")) {
+        buildTypes.release.signingConfig = signingConfigs.release
+        buildTypes.debug.signingConfig = signingConfigs.release
+        signingConfigs.release.storeFile = file(properties.get("chiakiKeystore"))
+        signingConfigs.release.storePassword = properties.get("chiakiKeystorePW")
+        signingConfigs.release.keyAlias = properties.get("chiakiKeyAlias")
+        signingConfigs.release.keyPassword = properties.get("chiakiKeyPW")
+    } else if (file("pstranslator-signing.jks").exists()) {
+        signingConfigs.release.storeFile = file("pstranslator-signing.jks")
+        signingConfigs.release.storePassword = "pstranslator2026"
+        signingConfigs.release.keyAlias = "pstranslator"
+        signingConfigs.release.keyPassword = "pstranslator2026"
+        buildTypes.release.signingConfig = signingConfigs.release
+        buildTypes.debug.signingConfig = signingConfigs.release
+    }
+}
+
+// Automatically package & embed Samsung Tizen (.wgt) and Android TV (.apk) inside TIBANSUB's assets/tv/
+tasks.register("packageTizenWgt") {
+    def tizenDir = file("../tizen-tv")
+    def outDir = file("src/main/assets/tv")
+    outputs.file(new File(outDir, "TIBANSUB-Samsung-TV.wgt"))
+    doLast {
+        outDir.mkdirs()
+        def wgtAssetFile = new File(outDir, "TIBANSUB-Samsung-TV.wgt")
+        def wgtDistFile = new File(tizenDir, "TIBANSUB-Samsung-TV.wgt")
+        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(wgtAssetFile))
+        try {
+            tizenDir.eachFileRecurse { f ->
+                if (f.isFile() && !f.name.endsWith(".wgt")) {
+                    String relPath = tizenDir.toURI().relativize(f.toURI()).getPath()
+                    zos.putNextEntry(new ZipEntry(relPath))
+                    f.withInputStream { ins -> zos << ins }
+                    zos.closeEntry()
+                }
+            }
+        } finally {
+            zos.close()
+        }
+        java.nio.file.Files.copy(
+            wgtAssetFile.toPath(),
+            wgtDistFile.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+        println("Embedded Samsung TV WGT: ${wgtAssetFile.length()} bytes")
+    }
+}
+
+tasks.register("embedAndroidTvApk") {
+    dependsOn(":android-tv:assembleDebug", "packageTizenWgt")
+    doLast {
+        def tvOutDir = file("src/main/assets/tv")
+        tvOutDir.mkdirs()
+        def tvApkTree = fileTree(dir: "../android-tv/build/outputs/apk/debug", include: ["**/*.apk"])
+        if (!tvApkTree.isEmpty()) {
+            def srcApk = tvApkTree.singleFile
+            def dstApk = new File(tvOutDir, "TIBANSUB-Android-TV.apk")
+            java.nio.file.Files.copy(
+                srcApk.toPath(),
+                dstApk.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+            println("Embedded Android TV APK: ${dstApk.length()} bytes")
+        }
+    }
+}
+
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }.configureEach {
+    dependsOn("embedAndroidTvApk")
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        freeCompilerArgs += "-opt-in=kotlin.ExperimentalUnsignedTypes"
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.3.1'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-reactivestreams:2.5.1'
+
+    // Jetpack Compose for TIBANSUB Glassy V20 + Liquid Glass Motion Shell
+    def composeBom = platform('androidx.compose:compose-bom:2023.10.01')
+    implementation composeBom
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'androidx.compose.runtime:runtime-livedata'
+    implementation 'androidx.activity:activity-compose:1.8.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2'
+
+    implementation "io.reactivex.rxjava2:rxjava:2.2.20"
+    implementation "io.reactivex.rxjava2:rxkotlin:2.4.0"
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+
+    def room_version = "2.5.2"
+    implementation "androidx.room:room-runtime:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
+    implementation "androidx.room:room-rxjava2:$room_version"
+
+    implementation "com.squareup.moshi:moshi:1.14.0"
+    kapt "com.squareup.moshi:moshi-kotlin-codegen:1.14.0"
+
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+}

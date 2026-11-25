@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/android-tv/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+/dist/
+openssl-*.tar.gz
+app/openssl-*.tar.gz
+lib/openssl-*.tar.gz
+app/src/main/assets/tv/TIBANSUB-Android-TV.apk
