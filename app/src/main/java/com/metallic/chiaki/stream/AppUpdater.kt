@@ -22,9 +22,9 @@ import java.net.URL
  *    inside the app with live progress and launches the Android Package Installer via FileProvider.
  */
 object AppUpdater {
-	private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/ps-translator/releases/latest"
-	private const val DIRECT_APK_DOWNLOAD_URL = "https://github.com/teeradream/ps-translator/releases/latest/download/PS-Translator.apk"
-	private const val CLOUD_TSV_URL = "https://raw.githubusercontent.com/teeradream/ps-translator/main/app/src/main/assets/preload_gta6_cache.tsv"
+	private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/tibansub/releases/latest"
+	private const val DIRECT_APK_DOWNLOAD_URL = "https://github.com/teeradream/tibansub/releases/latest/download/TIBANSUB.apk"
+	private const val CLOUD_TSV_URL = "https://raw.githubusercontent.com/teeradream/tibansub/main/app/src/main/assets/preload_gta6_cache.tsv"
 
 	data class ReleaseInfo(
 		val tagName: String,
@@ -62,7 +62,7 @@ object AppUpdater {
 					val aName = a.optString("name", "")
 					val url = a.optString("browser_download_url", "")
 					if (url.isEmpty() || !aName.endsWith(".apk", ignoreCase = true)) continue
-					if (aName.equals("PS-Translator.apk", ignoreCase = true)) {
+					if (aName.equals("TIBANSUB.apk", ignoreCase = true)) {
 						apkUrl = url
 						break
 					}

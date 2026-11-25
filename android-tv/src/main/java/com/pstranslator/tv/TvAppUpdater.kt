@@ -15,8 +15,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object TvAppUpdater {
-    private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/ps-translator/releases/latest"
-    private const val DIRECT_TV_APK_URL = "https://github.com/teeradream/ps-translator/releases/latest/download/TV-PS-Translator-Android.apk"
+    private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/tibansub/releases/latest"
+    private const val DIRECT_TV_APK_URL = "https://github.com/teeradream/tibansub/releases/latest/download/TIBANSUB-Android-TV.apk"
 
     data class TvReleaseInfo(
         val tagName: String,
@@ -65,7 +65,7 @@ object TvAppUpdater {
                     val aName = a.optString("name", "")
                     val url = a.optString("browser_download_url", "")
                     if (url.isEmpty() || !aName.endsWith(".apk", ignoreCase = true)) continue
-                    if (aName.equals("TV-PS-Translator-Android.apk", ignoreCase = true) ||
+                    if (aName.equals("TIBANSUB-Android-TV.apk", ignoreCase = true) ||
                         aName.contains("tv", ignoreCase = true)
                     ) {
                         apkUrl = url
