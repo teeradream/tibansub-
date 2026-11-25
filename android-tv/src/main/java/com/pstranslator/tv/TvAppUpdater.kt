@@ -15,8 +15,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object TvAppUpdater {
-    private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/tibansub/releases/latest"
-    private const val DIRECT_TV_APK_URL = "https://github.com/teeradream/tibansub/releases/latest/download/TIBANSUB-Android-TV.apk"
+    private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/tibansub-/releases/latest"
+    private const val DIRECT_TV_APK_URL = "https://github.com/teeradream/tibansub-/releases/latest/download/TIBANSUB-Android-TV.apk"
 
     data class TvReleaseInfo(
         val tagName: String,
