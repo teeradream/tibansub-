@@ -116,7 +116,12 @@ object TizenSdbWgtInstaller {
             .putString(KEY_ACCESS_TOKEN, session.accessToken)
             .putString(KEY_USER_ID, session.userId)
             .putString(KEY_EMAIL, session.email)
+            .remove(KEY_ISSUED_DUID)
             .apply()
+        // Clear any previously cached issued certs so a fresh sign-in always re-issues cleanly
+        listOf(ISSUED_AUTHOR_KEY, ISSUED_AUTHOR_CERT, ISSUED_DIST_KEY, ISSUED_DIST_CERT).forEach { name ->
+            try { File(context.filesDir, name).delete() } catch (_: Exception) {}
+        }
     }
 
     fun getSavedSamsungSession(context: Context): SamsungAccountSession? {
@@ -538,6 +543,22 @@ object TizenSdbWgtInstaller {
         return loadImportedP12Bundle(context)
     }
 
+    private fun extractPemCertBodies(pem: String): List<String> {
+        val regex = Regex("-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", RegexOption.DOT_MATCHES_ALL)
+        val matches = regex.findAll(pem).map { it.groupValues[1].replace(Regex("[\\r\\n\\s]+"), "") }.filter { it.isNotEmpty() }.toList()
+        return if (matches.isNotEmpty()) matches else listOf(stripPemHeaders(pem))
+    }
+
+    private fun buildCertChainWithCa(leafPem: String, caPem: String): List<String> {
+        val list = ArrayList<String>()
+        list.addAll(extractPemCertBodies(leafPem))
+        val caBody = extractPemCertBodies(caPem).firstOrNull()
+        if (!caBody.isNullOrEmpty() && list.none { it == caBody }) {
+            list.add(caBody)
+        }
+        return list
+    }
+
     private fun loadIssuedCertFiles(
         context: Context,
         authorKeyFile: File,
@@ -554,8 +575,8 @@ object TizenSdbWgtInstaller {
         val distCaPem = readBundledCaPem(context, "vd_tizen_dev_public2.crt")
 
         return SigningBundle(
-            author = CertIdentity(aKey, listOf(stripPemHeaders(aLeafPem), stripPemHeaders(authorCaPem))),
-            distributor = CertIdentity(dKey, listOf(stripPemHeaders(dLeafPem), stripPemHeaders(distCaPem))),
+            author = CertIdentity(aKey, buildCertChainWithCa(aLeafPem, authorCaPem)),
+            distributor = CertIdentity(dKey, buildCertChainWithCa(dLeafPem, distCaPem)),
             distributorRawPem = dLeafPem
         )
     }
@@ -671,8 +692,8 @@ object TizenSdbWgtInstaller {
         val distCaPem = readBundledCaPem(context, "vd_tizen_dev_public2.crt")
 
         return SigningBundle(
-            author = CertIdentity(authorKp.private, listOf(stripPemHeaders(authorCertPem), stripPemHeaders(authorCaPem))),
-            distributor = CertIdentity(distKp.private, listOf(stripPemHeaders(distCertPem), stripPemHeaders(distCaPem))),
+            author = CertIdentity(authorKp.private, buildCertChainWithCa(authorCertPem, authorCaPem)),
+            distributor = CertIdentity(distKp.private, buildCertChainWithCa(distCertPem, distCaPem)),
             distributorRawPem = distCertPem
         )
     }
