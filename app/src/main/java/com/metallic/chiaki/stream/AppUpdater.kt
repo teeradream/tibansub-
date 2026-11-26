@@ -3,7 +3,6 @@ package com.metallic.chiaki.stream
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,8 +17,8 @@ import java.net.URL
  * Provides:
  * 1. Over-The-Air (OTA) Cloud Database Sync: pulls the latest preload_gta6_cache.tsv directly from GitHub
  *    into TranslationCacheDb in-place without needing to download or install any new APK.
- * 2. In-App 1-Click APK Auto-Updater: downloads the latest PS-Translator.apk from GitHub Releases directly
- *    inside the app with live progress and launches the Android Package Installer via FileProvider.
+ * 2. In-App 1-Click APK Auto-Updater: checks GitHub Releases for newer versions, downloads TIBANSUB.apk
+ *    with live progress, and launches the Android Package Installer via FileProvider.
  */
 object AppUpdater {
 	private const val GITHUB_LATEST_RELEASE_API = "https://api.github.com/repos/teeradream/tibansub-/releases/latest"
@@ -33,11 +32,23 @@ object AppUpdater {
 		val publishedAt: String
 	)
 
+	fun isNewerVersion(remoteTag: String, currentVersion: String): Boolean {
+		val rParts = remoteTag.trim().removePrefix("v").removePrefix("V").split(".").map { it.toIntOrNull() ?: 0 }
+		val cParts = currentVersion.trim().removePrefix("v").removePrefix("V").split(".").map { it.toIntOrNull() ?: 0 }
+		val maxLen = maxOf(rParts.size, cParts.size)
+		for (i in 0 until maxLen) {
+			val r = rParts.getOrElse(i) { 0 }
+			val c = cParts.getOrElse(i) { 0 }
+			if (r != c) return r > c
+		}
+		return false
+	}
+
 	suspend fun fetchLatestReleaseInfo(): ReleaseInfo? = withContext(Dispatchers.IO) {
 		try {
 			val conn = (URL(GITHUB_LATEST_RELEASE_API).openConnection() as HttpURLConnection).apply {
 				requestMethod = "GET"
-				setRequestProperty("User-Agent", "PS-Translator-Android")
+				setRequestProperty("User-Agent", "TIBANSUB-Android")
 				setRequestProperty("Accept", "application/vnd.github+json")
 				connectTimeout = 6000
 				readTimeout = 6000
@@ -80,19 +91,16 @@ object AppUpdater {
 		}
 	}
 
-	/**
-	 * Syncs the latest translation database (preload_gta6_cache.tsv) directly from GitHub Cloud
-	 * into TranslationCacheDb without needing any APK download.
-	 */
 	suspend fun syncCloudSubtitleDatabase(
 		activity: Activity,
-		cacheDb: TranslationCacheDb
+		cacheDb: TranslationCacheDb,
+		targetGameId: String = TranslationCacheDb.DEFAULT_GAME_ID
 	): Int = withContext(Dispatchers.IO) {
 		val tmpFile = File(activity.cacheDir, "cloud_sync_cache.tsv")
 		try {
 			val conn = (URL("$CLOUD_TSV_URL?t=${System.currentTimeMillis()}").openConnection() as HttpURLConnection).apply {
 				requestMethod = "GET"
-				setRequestProperty("User-Agent", "PS-Translator-Android")
+				setRequestProperty("User-Agent", "TIBANSUB-Android")
 				connectTimeout = 8000
 				readTimeout = 15000
 			}
@@ -107,7 +115,7 @@ object AppUpdater {
 			}
 			conn.disconnect()
 			if (!tmpFile.exists() || tmpFile.length() < 32) return@withContext 0
-			cacheDb.importFromUri(activity, Uri.fromFile(tmpFile))
+			cacheDb.importFromUri(activity, Uri.fromFile(tmpFile), targetGameId)
 		} catch (_: Exception) {
 			0
 		} finally {
@@ -115,9 +123,6 @@ object AppUpdater {
 		}
 	}
 
-	/**
-	 * Downloads the latest APK directly inside the app and triggers Android's native Package Installer.
-	 */
 	suspend fun downloadAndInstallApk(
 		activity: Activity,
 		apkUrl: String = DIRECT_APK_DOWNLOAD_URL,
@@ -126,12 +131,12 @@ object AppUpdater {
 		try {
 			val updateDir = File(activity.cacheDir, "app_updates")
 			if (!updateDir.exists()) updateDir.mkdirs()
-			val apkFile = File(updateDir, "PS-Translator-Update.apk")
+			val apkFile = File(updateDir, "TIBANSUB-Update.apk")
 			if (apkFile.exists()) apkFile.delete()
 
 			val conn = (URL(apkUrl).openConnection() as HttpURLConnection).apply {
 				instanceFollowRedirects = true
-				setRequestProperty("User-Agent", "PS-Translator-Android")
+				setRequestProperty("User-Agent", "TIBANSUB-Android")
 				connectTimeout = 10000
 				readTimeout = 30000
 			}
@@ -185,7 +190,7 @@ object AppUpdater {
 			}
 			true
 		} catch (e: Exception) {
-			android.util.Log.e("PSTranslatorUpdate", "In-app update failed: ${e.message}", e)
+			android.util.Log.e("TibanSubUpdate", "In-app update failed: ${e.message}", e)
 			false
 		}
 	}

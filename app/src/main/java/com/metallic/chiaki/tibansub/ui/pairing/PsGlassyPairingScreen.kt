@@ -2,11 +2,12 @@ package com.metallic.chiaki.tibansub.ui.pairing
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.net.Uri
+import android.graphics.Bitmap
 import android.util.Base64
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -16,7 +17,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -24,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +59,7 @@ import com.metallic.chiaki.tibansub.psn.PsnAccountHelper
 import com.metallic.chiaki.tibansub.ui.theme.*
 import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class PsTargetOption(val label: String, val target: ConsoleTarget) {
     PS5("PS5", ConsoleTarget.PS5_1),
@@ -79,6 +89,7 @@ fun PsGlassyPairingScreen(
     var showSonyOAuthDialog by remember { mutableStateOf(false) }
     var showInAppLookupWebDialog by remember { mutableStateOf(false) }
 
+    var isFetchingPsn by remember { mutableStateOf(false) }
     var isPairing by remember { mutableStateOf(false) }
     var pairingSuccess by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -106,14 +117,14 @@ fun PsGlassyPairingScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Top Step Indicator Pills (Matching Draft)
+        // Top Step Indicator Pills
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StepBadgePill("1. เตรียม 2 บัญชี ✓", active = false, done = step1Done)
+            StepBadgePill("1. เตรียม 2 บัญชี", active = false, done = step1Done)
             StepBadgePill(
-                if (step2Done) "2. PSN ID พร้อม ✓" else "2. ดึง PSN ID",
+                if (step2Done) "2. PSN ID พร้อม" else "2. ดึง PSN ID",
                 active = !step2Done,
                 done = step2Done
             )
@@ -131,26 +142,36 @@ fun PsGlassyPairingScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Floating Squircle Badge Icon
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
+                        .size(56.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.20f))
-                        .border(1.2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(16.dp)),
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0x55006FCD), Color(0x553BF0FF))
+                            )
+                        )
+                        .border(1.2.dp, TibanColors.AccentCyan.copy(alpha = 0.8f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (pairingSuccess) "✓" else "🔗",
-                        fontSize = 24.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (pairingSuccess) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = TibanColors.AccentMint,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    } else {
+                        PlayStationLogoIcon(
+                            modifier = Modifier.size(34.dp, 26.dp),
+                            tint = Color.White
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = if (pairingSuccess) "จับคู่เครื่องสำเร็จแล้ว!" else "เชื่อมต่อ ${selectedTarget.label}",
+                    text = if (pairingSuccess) "จับคู่เครื่องสำเร็จแล้ว" else "เชื่อมต่อ ${selectedTarget.label}",
                     fontFamily = TibanPromptFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
@@ -166,7 +187,6 @@ fun PsGlassyPairingScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
 
-                // Console Version Pills
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PsTargetOption.values().forEach { opt ->
                         LiquidGlassSelectablePill(
@@ -179,12 +199,12 @@ fun PsGlassyPairingScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // PSN Account ID Section (In-App OAuth + In-App Username Lookup + Direct Paste)
+                // PSN Account ID Section
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x2E100826))
+                        .background(Color(0x550D0722))
                         .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
                         .padding(12.dp)
                 ) {
@@ -201,7 +221,7 @@ fun PsGlassyPairingScreen(
                             color = Color.White
                         )
                         Text(
-                            text = if (step2Done) "✓ ถูกต้อง" else "ต้องระบุ 1 ครั้ง",
+                            text = if (step2Done) "พร้อมใช้งาน" else "ต้องระบุ 1 ครั้ง",
                             fontFamily = TibanPromptFontFamily,
                             fontSize = 12.sp,
                             color = if (step2Done) TibanColors.AccentMint else TibanColors.AccentGold
@@ -211,16 +231,28 @@ fun PsGlassyPairingScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         LiquidGlassButton(
-                            text = "🔑 ล็อกอิน PSN ดึงอัตโนมัติ",
+                            text = if (isFetchingPsn) "กำลังดึงรหัส..." else "ล็อกอิน PSN ดึงอัตโนมัติ",
                             primaryGlow = !step2Done,
+                            enabled = !isFetchingPsn,
+                            leadingContent = {
+                                Icon(
+                                    Icons.Rounded.Key,
+                                    contentDescription = null,
+                                    tint = if (!step2Done) Color(0xFF130A2B) else Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
                             onClick = { showSonyOAuthDialog = true },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1.15f)
                         )
                         LiquidGlassButton(
-                            text = "🔍 ค้นจากชื่อ PSN",
+                            text = "ค้นจากชื่อ PSN",
                             primaryGlow = false,
+                            leadingContent = {
+                                Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            },
                             onClick = { showInAppLookupWebDialog = true },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(0.85f)
                         )
                     }
 
@@ -242,7 +274,6 @@ fun PsGlassyPairingScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Host IP Row
                 OutlinedTextField(
                     value = hostIp,
                     onValueChange = {
@@ -271,7 +302,6 @@ fun PsGlassyPairingScreen(
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                // Exact Glassy OTP V20 8-Digit Slots
                 GlassyDigitSlotsInput(
                     value = pinDigits,
                     onValueChange = { pinDigits = it },
@@ -286,14 +316,14 @@ fun PsGlassyPairingScreen(
                         fontFamily = TibanPromptFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
-                        color = if (isError) Color(0xFFFF9AA2) else TibanColors.AccentMint,
+                        color = if (isError) TibanColors.ErrorSoft else TibanColors.AccentMint,
                         textAlign = TextAlign.Center
                     )
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                if (isPairing) {
+                if (isPairing || isFetchingPsn) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -304,14 +334,14 @@ fun PsGlassyPairingScreen(
                             modifier = Modifier.size(22.dp)
                         )
                         Text(
-                            text = "กำลังจับคู่กับเครื่อง PlayStation...",
+                            text = if (isFetchingPsn) "กำลังดึงรหัส PSN Account ID จาก Sony..." else "กำลังจับคู่กับเครื่อง PlayStation...",
                             fontFamily = TibanPromptFontFamily,
                             color = Color.White
                         )
                     }
                 } else {
                     LiquidGlassButton(
-                        text = if (pairingSuccess) "เสร็จสิ้น — พร้อมเริ่มแปลภาษา ✓" else "ยืนยันรหัส & จับคู่เครื่องถาวร",
+                        text = if (pairingSuccess) "เสร็จสิ้น — พร้อมเริ่มแปลภาษา" else "ยืนยันรหัส & จับคู่เครื่องถาวร",
                         enabled = pairingSuccess || (normalizedBase64 != null && pinDigits.length == 8),
                         onClick = {
                             if (pairingSuccess) {
@@ -376,7 +406,7 @@ fun PsGlassyPairingScreen(
                                                         isPairing = false
                                                         pairingSuccess = true
                                                         isError = false
-                                                        statusMessage = "จับคู่สำเร็จกับ ${host.serverNickname}! บันทึกเครื่องถาวรเรียบร้อยแล้ว"
+                                                        statusMessage = "จับคู่สำเร็จกับ ${host.serverNickname} บันทึกเครื่องถาวรเรียบร้อยแล้ว"
                                                     }
                                                 }, { err ->
                                                     scope.launch {
@@ -390,13 +420,11 @@ fun PsGlassyPairingScreen(
                                             scope.launch {
                                                 isPairing = false
                                                 isError = true
-                                                statusMessage = "จับคู่ไม่สำเร็จ: ตรวจสอบว่าล็อกอินถูกบัญชี สำรอง/หลัก ตรงกับ PSN ID และอยู่ใน Wi-Fi เดียวกัน"
+                                                statusMessage = "จับคู่ไม่สำเร็จ: ตรวจสอบว่าล็อกอินถูกบัญชีตรงกับ PSN ID และอยู่ใน Wi-Fi เดียวกัน"
                                             }
                                         }
                                         is RegistEventCanceled -> {
-                                            scope.launch {
-                                                isPairing = false
-                                            }
+                                            scope.launch { isPairing = false }
                                         }
                                     }
                                 }
@@ -413,8 +441,11 @@ fun PsGlassyPairingScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     LiquidGlassButton(
-                        text = "📖 ดูวิธีทำทีละขั้น",
+                        text = "ดูวิธีทำทีละขั้น",
                         primaryGlow = false,
+                        leadingContent = {
+                            Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        },
                         onClick = onOpenGuide,
                         modifier = Modifier.weight(1f)
                     )
@@ -431,16 +462,18 @@ fun PsGlassyPairingScreen(
         Spacer(modifier = Modifier.height(80.dp))
     }
 
-    // In-App Sony Remote Play OAuth Dialog (Auto-fetches PSN Account ID -> Base64)
+    // In-App Sony Remote Play OAuth Dialog (chiaki-ng verified secret + multi-hook redirect capture)
     if (showSonyOAuthDialog) {
         SonyPsnOAuthWebViewDialog(
             onDismiss = { showSonyOAuthDialog = false },
             onCodeReceived = { authCode ->
                 showSonyOAuthDialog = false
-                statusMessage = "กำลังแปลงรหัส PSN Account ID อัตโนมัติ..."
+                isFetchingPsn = true
+                statusMessage = "กำลังดึงรหัส PSN Account ID และแปลงเป็น Base64 อัตโนมัติ..."
                 isError = false
                 scope.launch {
                     val res = PsnAccountHelper.exchangeOAuthCodeForBase64Id(authCode)
+                    isFetchingPsn = false
                     res.onSuccess { (base64Id, onlineName) ->
                         psnIdInput = base64Id
                         psnDisplayLabel = onlineName
@@ -448,17 +481,16 @@ fun PsGlassyPairingScreen(
                             .putString("saved_psn_id", base64Id)
                             .putString("saved_psn_online_label", onlineName)
                             .apply()
-                        statusMessage = "ดึง PSN ID ของ $onlineName สำเร็จแล้ว! กรอกเลข PIN 8 หลักต่อได้เลย"
+                        statusMessage = "ดึง PSN ID ของ $onlineName สำเร็จแล้ว ($base64Id) กรอก PIN 8 หลักต่อได้เลย"
                     }.onFailure { err ->
                         isError = true
-                        statusMessage = "${err.message} — สามารถกดปุ่ม 'ค้นจากชื่อ PSN' แทนได้ทันที"
+                        statusMessage = "${err.message} — ลองล็อกอินใหม่ หรือใช้ปุ่ม 'ค้นจากชื่อ PSN' แทนได้"
                     }
                 }
             }
         )
     }
 
-    // In-App PSN Online ID Lookup Helper Dialog (No leaving the app!)
     if (showInAppLookupWebDialog) {
         InAppPsnLookupDialog(
             onDismiss = { showInAppLookupWebDialog = false },
@@ -479,9 +511,9 @@ private fun StepBadgePill(label: String, active: Boolean, done: Boolean) {
             .clip(CircleShape)
             .background(
                 when {
-                    active -> Color.White.copy(alpha = 0.90f)
+                    active -> Color.White.copy(alpha = 0.92f)
                     done -> Color(0x3800FFA6)
-                    else -> Color(0x2E140B30)
+                    else -> Color(0x55130A2B)
                 }
             )
             .border(
@@ -500,7 +532,7 @@ private fun StepBadgePill(label: String, active: Boolean, done: Boolean) {
             fontFamily = TibanPromptFontFamily,
             fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
             fontSize = 11.5.sp,
-            color = if (active) Color(0xFF1A103D) else Color.White
+            color = if (active) Color(0xFF130A2B) else Color.White
         )
     }
 }
@@ -511,6 +543,22 @@ private fun SonyPsnOAuthWebViewDialog(
     onDismiss: () -> Unit,
     onCodeReceived: (String) -> Unit
 ) {
+    val codeDelivered = remember { AtomicBoolean(false) }
+
+    fun tryCaptureCode(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        if (url.startsWith(PsnAccountHelper.SONY_REDIRECT_PREFIX, ignoreCase = true) ||
+            url.contains("remoteplay/redirect", ignoreCase = true)
+        ) {
+            val code = PsnAccountHelper.extractCodeFromRedirectOrInput(url)
+            if (!code.isNullOrBlank() && codeDelivered.compareAndSet(false, true)) {
+                onCodeReceived(code)
+                return true
+            }
+        }
+        return false
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -518,9 +566,9 @@ private fun SonyPsnOAuthWebViewDialog(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(12.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF140C2E))
+                .background(Color(0xFF130A2B))
                 .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
         ) {
             Row(
@@ -539,13 +587,20 @@ private fun SonyPsnOAuthWebViewDialog(
                         color = Color.White
                     )
                     Text(
-                        "เมื่อล็อกอินสำเร็จ แอปจะดึงรหัส Base64 มาใส่ช่องให้อัตโนมัติทันที",
+                        "เมื่อล็อกอินสำเร็จ แอปจะดึงรหัส PSN Account ID อัตโนมัติทันที",
                         fontFamily = TibanPromptFontFamily,
                         fontSize = 11.5.sp,
                         color = TibanColors.TextMuted
                     )
                 }
-                LiquidGlassSelectablePill(label = "ปิด ✕", selected = false, onClick = onDismiss)
+                LiquidGlassSelectablePill(
+                    label = "ปิด",
+                    selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    },
+                    onClick = onDismiss
+                )
             }
 
             AndroidView(
@@ -556,24 +611,52 @@ private fun SonyPsnOAuthWebViewDialog(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        CookieManager.getInstance().setAcceptCookie(true)
-                        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                        val wv = this
+                        CookieManager.getInstance().apply {
+                            setAcceptCookie(true)
+                            setAcceptThirdPartyCookies(wv, true)
+                        }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.setSupportMultipleWindows(false)
+                        // Remove '; wv' so Sony OAuth treats this as a standard mobile browser
+                        settings.userAgentString = settings.userAgentString
+                            .replace("; wv", "")
+                            .replace("Version/4.0 ", "")
+
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
                                 view: WebView?,
                                 request: WebResourceRequest?
                             ): Boolean {
-                                val url = request?.url?.toString() ?: return false
-                                if (url.startsWith(PsnAccountHelper.SONY_REDIRECT_PREFIX)) {
-                                    val code = Uri.parse(url).getQueryParameter("code")
-                                    if (!code.isNullOrBlank()) {
-                                        onCodeReceived(code)
-                                        return true
-                                    }
-                                }
+                                val url = request?.url?.toString()
+                                if (tryCaptureCode(url)) return true
                                 return false
+                            }
+
+                            @Deprecated("Deprecated in Java")
+                            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                                if (tryCaptureCode(url)) return true
+                                return false
+                            }
+
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                if (tryCaptureCode(url)) {
+                                    view?.stopLoading()
+                                }
+                            }
+
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): WebResourceResponse? {
+                                val url = request?.url?.toString()
+                                if (!url.isNullOrBlank() && url.contains("remoteplay/redirect", ignoreCase = true)) {
+                                    view?.post { tryCaptureCode(url) }
+                                }
+                                return super.shouldInterceptRequest(view, request)
                             }
                         }
                         loadUrl(PsnAccountHelper.SONY_OAUTH_AUTHORIZE_URL)
@@ -599,9 +682,9 @@ private fun InAppPsnLookupDialog(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(12.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF140C2E))
+                .background(Color(0xFF130A2B))
                 .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -617,7 +700,14 @@ private fun InAppPsnLookupDialog(
                         fontSize = 16.sp,
                         color = Color.White
                     )
-                    LiquidGlassSelectablePill(label = "ปิด ✕", selected = false, onClick = onDismiss)
+                    LiquidGlassSelectablePill(
+                        label = "ปิด",
+                        selected = false,
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        },
+                        onClick = onDismiss
+                    )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -627,7 +717,7 @@ private fun InAppPsnLookupDialog(
                     OutlinedTextField(
                         value = pastedValue,
                         onValueChange = { pastedValue = it },
-                        placeholder = { Text("วางรหัส Base64 หรือเลข Account ID ที่คัดลอกมาตรงนี้", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp) },
+                        placeholder = { Text("วางรหัส Base64 หรือเลข Account ID ตรงนี้", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,

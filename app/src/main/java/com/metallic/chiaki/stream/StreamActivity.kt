@@ -284,6 +284,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	private val hideMenuButtonRunnable = Runnable {
 		if (::binding.isInitialized && !binding.menuPanelContainer.isVisible) {
 			binding.btnMenuToggle.animate().alpha(0.35f).setDuration(300).start()
+			binding.btnStreamBack.animate().alpha(0.35f).setDuration(300).start()
 		}
 	}
 
@@ -339,6 +340,11 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		isFilterShortTextEnabled = cropPrefs.getBoolean("filter_short_ui", true)
 		binding.filterShortTextSwitch.isChecked = isFilterShortTextEnabled
 		setupCropEditor()
+
+		// Top-Left Back Button -> Exit Stream back to TIBANSUB Home
+		binding.btnStreamBack.setOnClickListener {
+			finish()
+		}
 
 		// 3-Lines Circular Menu Button -> Liquid Glass Bottom Sheet
 		binding.btnMenuToggle.setOnClickListener {
@@ -648,6 +654,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 	private fun resetMenuButtonTimer() {
 		binding.btnMenuToggle.alpha = 1.0f
+		binding.btnStreamBack.alpha = 1.0f
 		uiVisibilityHandler.removeCallbacks(hideMenuButtonRunnable)
 		uiVisibilityHandler.postDelayed(hideMenuButtonRunnable, 3500)
 	}
@@ -3585,6 +3592,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 		attachLiquidGlassPressPhysics(binding.menuSheetContainer)
 		attachLiquidGlassPressPhysics(binding.topQuickDrawerPanel)
+		attachLiquidGlassPressPhysics(binding.btnStreamBack)
 		attachLiquidGlassPressPhysics(binding.btnMenuToggle)
 		attachLiquidGlassPressPhysics(binding.btnScanNoteFloat)
 		attachLiquidGlassPressPhysics(binding.btnTextOnlyFloat)

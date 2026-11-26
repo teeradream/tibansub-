@@ -37,12 +37,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,20 +58,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Full-screen pure Twilight-to-Sunset gradient background (Indigo -> Violet -> Magenta -> Coral -> Gold)
- * with subtle breathing liquid light refraction — strictly ZERO palm trees and ZERO background icons.
+ * Option B: Leonida Twilight Dusk ambient gradient background
+ * (Deep Indigo #090E2E -> Deep Plum #211046 -> Deep Neon Berry #661A5E -> Warm Sunset #B5425A -> Horizon Amber #D97A4A)
+ * with soft breathing ambient light orbs for crisp Dark Liquid Glass contrast.
  */
 @Composable
 fun TibanSunsetBackground(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "sunsetGlow")
+    val infiniteTransition = rememberInfiniteTransition(label = "duskGlow")
     val drift by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 10000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "drift"
@@ -84,30 +86,23 @@ fun TibanSunsetBackground(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            // Soft silky ambient glow orbs for realistic glass refraction (pure smooth color)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0x40FF65D8),
-                        Color.Transparent
-                    ),
-                    center = Offset(w * (0.25f + 0.12f * drift), h * (0.32f + 0.06f * drift)),
+                    colors = listOf(Color(0x3D8B3DFF), Color.Transparent),
+                    center = Offset(w * (0.18f + 0.09f * drift), h * (0.36f + 0.05f * drift)),
                     radius = w * 0.72f
                 ),
                 radius = w * 0.72f,
-                center = Offset(w * (0.25f + 0.12f * drift), h * (0.32f + 0.06f * drift))
+                center = Offset(w * (0.18f + 0.09f * drift), h * (0.36f + 0.05f * drift))
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0x38FFE07D),
-                        Color.Transparent
-                    ),
-                    center = Offset(w * (0.82f - 0.10f * drift), h * 0.84f),
-                    radius = w * 0.65f
+                    colors = listOf(Color(0x47FF9458), Color.Transparent),
+                    center = Offset(w * (0.80f - 0.08f * drift), h * 0.88f),
+                    radius = w * 0.68f
                 ),
-                radius = w * 0.65f,
-                center = Offset(w * (0.82f - 0.10f * drift), h * 0.84f)
+                radius = w * 0.68f,
+                center = Offset(w * (0.80f - 0.08f * drift), h * 0.88f)
             )
         }
         content()
@@ -115,7 +110,112 @@ fun TibanSunsetBackground(
 }
 
 /**
- * Multi-layered Liquid Glass Card with Specular Rim Border & Inner Top Highlight (Glassy V20 + Liquid Glass Motion).
+ * Vector PlayStation Logo Icon (upright P stem + 3D perspective S ribbon — crisp at every DPI).
+ */
+@Composable
+fun PlayStationLogoIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = Color.White
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val sx = w / 32f
+        val sy = h / 24f
+
+        // Upright P pillar + curved loop
+        val pPath = Path().apply {
+            moveTo(12.2f * sx, 2.2f * sy)
+            lineTo(12.2f * sx, 21.6f * sy)
+            lineTo(16.0f * sx, 22.8f * sy)
+            lineTo(16.0f * sx, 7.6f * sy)
+            cubicTo(16.0f * sx, 6.2f * sy, 16.9f * sx, 5.7f * sy, 18.1f * sx, 6.1f * sy)
+            cubicTo(19.3f * sx, 6.5f * sy, 19.8f * sx, 7.7f * sy, 19.8f * sx, 9.4f * sy)
+            cubicTo(19.8f * sx, 11.4f * sy, 18.7f * sx, 12.2f * sy, 17.2f * sx, 11.8f * sy)
+            lineTo(17.2f * sx, 15.2f * sy)
+            cubicTo(20.9f * sx, 16.1f * sy, 23.6f * sx, 14.3f * sy, 23.6f * sx, 10.1f * sy)
+            cubicTo(23.6f * sx, 6.2f * sy, 21.4f * sx, 4.1f * sy, 17.8f * sx, 3.2f * sy)
+            lineTo(12.2f * sx, 2.2f * sy)
+            close()
+        }
+        drawPath(pPath, color = tint)
+
+        // Left perspective S wing
+        val leftS = Path().apply {
+            moveTo(10.8f * sx, 14.2f * sy)
+            lineTo(3.4f * sx, 16.8f * sy)
+            cubicTo(1.2f * sx, 17.6f * sy, 1.0f * sx, 19.6f * sy, 3.2f * sx, 20.5f * sy)
+            cubicTo(5.2f * sx, 21.3f * sy, 7.9f * sx, 21.0f * sy, 10.8f * sx, 19.9f * sy)
+            lineTo(10.8f * sx, 17.2f * sy)
+            lineTo(6.9f * sx, 18.6f * sy)
+            cubicTo(6.0f * sx, 18.9f * sy, 5.4f * sx, 18.5f * sy, 6.2f * sx, 18.1f * sy)
+            lineTo(10.8f * sx, 16.5f * sy)
+            close()
+        }
+        drawPath(leftS, color = tint)
+
+        // Right perspective S wing
+        val rightS = Path().apply {
+            moveTo(17.5f * sx, 16.4f * sy)
+            lineTo(17.5f * sx, 19.2f * sy)
+            lineTo(22.4f * sx, 17.5f * sy)
+            cubicTo(23.8f * sx, 17.0f * sy, 25.1f * sx, 17.3f * sy, 24.4f * sx, 17.8f * sy)
+            lineTo(17.5f * sx, 20.3f * sy)
+            lineTo(17.5f * sx, 22.9f * sy)
+            lineTo(28.3f * sx, 19.0f * sy)
+            cubicTo(30.8f * sx, 18.1f * sy, 30.8f * sx, 15.8f * sy, 28.0f * sx, 15.1f * sy)
+            cubicTo(25.4f * sx, 14.5f * sy, 22.2f * sx, 14.8f * sy, 17.5f * sx, 16.4f * sy)
+            close()
+        }
+        drawPath(rightS, color = tint)
+    }
+}
+
+/**
+ * Vector Xbox Sphere Logo Icon (clean outer ring + curved intersecting X ribbon arcs).
+ */
+@Composable
+fun XboxLogoIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = Color.White
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val strokeW = (w * 0.085f).coerceAtLeast(1.8.dp.toPx())
+        val radius = (minOf(w, h) * 0.44f)
+        val cx = w / 2f
+        val cy = h / 2f
+
+        // Outer Xbox sphere ring
+        drawCircle(
+            color = tint,
+            radius = radius,
+            center = Offset(cx, cy),
+            style = Stroke(width = strokeW)
+        )
+
+        // Curved intersecting X arcs
+        val leftArc = Path().apply {
+            moveTo(cx - radius * 0.62f, cy - radius * 0.66f)
+            quadraticBezierTo(cx + radius * 0.04f, cy - radius * 0.14f, cx + radius * 0.64f, cy + radius * 0.68f)
+        }
+        val rightArc = Path().apply {
+            moveTo(cx + radius * 0.62f, cy - radius * 0.66f)
+            quadraticBezierTo(cx - radius * 0.04f, cy - radius * 0.14f, cx - radius * 0.64f, cy + radius * 0.68f)
+        }
+        val arcStroke = Stroke(
+            width = (w * 0.115f).coerceAtLeast(2.2.dp.toPx()),
+            cap = StrokeCap.Round,
+            join = StrokeJoin.Round
+        )
+        drawPath(leftArc, color = tint, style = arcStroke)
+        drawPath(rightArc, color = tint, style = arcStroke)
+    }
+}
+
+/**
+ * High-Contrast Dark Liquid Glass Card with Specular Rim Border & Inner Top Highlight.
  */
 @Composable
 fun LiquidGlassCard(
@@ -131,13 +231,9 @@ fun LiquidGlassCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // Tactile spring physics from /liquid-glass-motion (stiffness 520, damping 24, mass 0.7)
     val scale by animateFloatAsState(
         targetValue = if (onClick != null && isPressed) 0.965f else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.64f,
-            stiffness = 520f
-        ),
+        animationSpec = spring(dampingRatio = 0.64f, stiffness = 520f),
         label = "cardScale"
     )
 
@@ -154,18 +250,18 @@ fun LiquidGlassCard(
 
     val rimBrush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.72f),
-            accentRimColor.copy(alpha = 0.42f),
-            Color.White.copy(alpha = 0.18f),
-            accentRimColor.copy(alpha = 0.55f)
+            Color.White.copy(alpha = 0.65f),
+            accentRimColor.copy(alpha = 0.45f),
+            Color.White.copy(alpha = 0.16f),
+            accentRimColor.copy(alpha = 0.52f)
         )
     )
 
     val fillBrush = Brush.verticalGradient(
         colors = listOf(
-            Color(0x38FFFFFF),
-            Color(0x3D160B32),
-            Color(0x52120829)
+            Color(0x9E190E38),
+            Color(0xB8130A2B),
+            Color(0xCC0D0720)
         )
     )
 
@@ -192,18 +288,17 @@ fun LiquidGlassCard(
             .border(BorderStroke(1.2.dp, rimBrush), shape)
             .drawWithContent {
                 drawContent()
-                // Inner top specular highlight line (shadow-[inset_0_1px_1px_rgba(255,255,255,0.45)])
                 drawLine(
                     brush = Brush.horizontalGradient(
                         listOf(
                             Color.Transparent,
-                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.50f),
                             Color.Transparent
                         )
                     ),
                     start = Offset(size.width * 0.12f, 1.dp.toPx()),
                     end = Offset(size.width * 0.88f, 1.dp.toPx()),
-                    strokeWidth = 1.3.dp.toPx()
+                    strokeWidth = 1.2.dp.toPx()
                 )
             }
             .then(clickableMod)
@@ -230,10 +325,7 @@ fun LiquidGlassButton(
 
     val scale by animateFloatAsState(
         targetValue = if (enabled && isPressed) 0.94f else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.62f,
-            stiffness = 520f
-        ),
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = 520f),
         label = "btnScale"
     )
 
@@ -241,24 +333,24 @@ fun LiquidGlassButton(
         !enabled -> Brush.horizontalGradient(listOf(Color(0x33FFFFFF), Color(0x22FFFFFF)))
         primaryGlow -> Brush.horizontalGradient(
             listOf(
-                Color(0xEBFFFFFF),
-                Color(0xE8FFE5F7),
-                Color(0xEBFFF0D6)
+                Color(0xF5FFFFFF),
+                Color(0xF0FFE5F7),
+                Color(0xF5FFEBD0)
             )
         )
         else -> Brush.horizontalGradient(
             listOf(
                 Color(0x36FFFFFF),
-                Color(0x24FFFFFF)
+                Color(0x22FFFFFF)
             )
         )
     }
 
     val borderBrush = Brush.linearGradient(
         listOf(
-            Color.White.copy(alpha = if (primaryGlow) 0.95f else 0.55f),
+            Color.White.copy(alpha = if (primaryGlow) 0.95f else 0.52f),
             TibanColors.AccentCyan.copy(alpha = if (primaryGlow) 0.65f else 0.25f),
-            Color.White.copy(alpha = 0.45f)
+            Color.White.copy(alpha = 0.42f)
         )
     )
 
@@ -267,7 +359,7 @@ fun LiquidGlassButton(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                alpha = if (enabled) 1f else 0.52f
+                alpha = if (enabled) 1f else 0.50f
             }
             .clip(CircleShape)
             .background(bgBrush)
@@ -280,27 +372,27 @@ fun LiquidGlassButton(
                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onClick()
             }
-            .padding(horizontal = 22.dp, vertical = 13.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (leadingContent != null) {
             leadingContent()
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(7.dp))
         }
         Text(
             text = text,
             fontFamily = TibanPromptFontFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = if (primaryGlow && enabled) Color(0xFF1A103D) else Color.White,
+            fontSize = 14.5.sp,
+            color = if (primaryGlow && enabled) Color(0xFF130A2B) else Color.White,
             textAlign = TextAlign.Center
         )
     }
 }
 
 /**
- * Tactile Selectable Glass Pill (for tabs, colors, AI providers, speed presets).
+ * Tactile Selectable Glass Pill.
  */
 @Composable
 fun LiquidGlassSelectablePill(
@@ -308,7 +400,8 @@ fun LiquidGlassSelectablePill(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    accentColor: Color = Color.White
+    accentColor: Color = Color.White,
+    leadingIcon: (@Composable () -> Unit)? = null
 ) {
     val view = LocalView.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -320,7 +413,7 @@ fun LiquidGlassSelectablePill(
         label = "pillScale"
     )
 
-    Box(
+    Row(
         modifier = modifier
             .graphicsLayer {
                 scaleX = scale
@@ -328,12 +421,12 @@ fun LiquidGlassSelectablePill(
             }
             .clip(CircleShape)
             .background(
-                if (selected) Color.White.copy(alpha = 0.88f)
-                else Color(0x2B150A30)
+                if (selected) Color.White.copy(alpha = 0.92f)
+                else Color(0x66130A2B)
             )
             .border(
                 width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) accentColor else Color.White.copy(alpha = 0.28f),
+                color = if (selected) accentColor else Color.White.copy(alpha = 0.30f),
                 shape = CircleShape
             )
             .clickable(
@@ -343,15 +436,20 @@ fun LiquidGlassSelectablePill(
                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 onClick()
             }
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 13.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
+        if (leadingIcon != null) {
+            leadingIcon()
+            Spacer(modifier = Modifier.width(6.dp))
+        }
         Text(
             text = label,
             fontFamily = TibanPromptFontFamily,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             fontSize = 13.sp,
-            color = if (selected) Color(0xFF1A103D) else Color.White
+            color = if (selected) Color(0xFF130A2B) else Color.White
         )
     }
 }
@@ -413,10 +511,10 @@ fun LiquidGlassToggleRow(
                     if (checked) Brush.horizontalGradient(
                         listOf(TibanColors.AccentCyan, TibanColors.AccentMint)
                     ) else Brush.horizontalGradient(
-                        listOf(Color(0x4012092B), Color(0x4012092B))
+                        listOf(Color(0x660B061C), Color(0x660B061C))
                     )
                 )
-                .border(1.dp, Color.White.copy(alpha = if (checked) 0.8f else 0.3f), CircleShape)
+                .border(1.dp, Color.White.copy(alpha = if (checked) 0.85f else 0.30f), CircleShape)
                 .padding(3.dp),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -432,7 +530,7 @@ fun LiquidGlassToggleRow(
 }
 
 /**
- * Glassy OTP V20 Digit Input Slots (Supports 8-digit PS5 PIN & 6-digit Wireless ADB Pairing Code).
+ * Glassy OTP V20 Digit Input Slots.
  */
 @Composable
 fun GlassyDigitSlotsInput(
@@ -452,7 +550,6 @@ fun GlassyDigitSlotsInput(
     )
 
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        // Hidden input field capturing numeric keypad & paste cleanly
         BasicTextField(
             value = value,
             onValueChange = { raw ->
@@ -556,8 +653,8 @@ private fun GlassySingleDigitBox(
             .height(boxHeight)
             .clip(RoundedCornerShape(14.dp))
             .background(
-                if (isActive) Color.White.copy(alpha = 0.24f)
-                else Color(0x38130A2E)
+                if (isActive) Color.White.copy(alpha = 0.22f)
+                else Color(0x66100826)
             )
             .border(
                 width = if (isActive) 1.8.dp else 1.1.dp,
@@ -587,7 +684,7 @@ private fun GlassySingleDigitBox(
 }
 
 /**
- * Velocity-Aware Liquid Glass Bottom Sheet with Child Follow-Through Inertia Bounce (/liquid-glass-motion).
+ * Velocity-Aware Liquid Glass Bottom Sheet with Child Follow-Through Inertia Bounce.
  */
 @Composable
 fun LiquidGlassBottomSheet(
@@ -624,7 +721,7 @@ fun LiquidGlassBottomSheet(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x8808041A))
+                .background(Color(0x99060314))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -639,9 +736,7 @@ fun LiquidGlassBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
-                    .graphicsLayer {
-                        translationY = smoothDragPx
-                    }
+                    .graphicsLayer { translationY = smoothDragPx }
                     .pointerInput(Unit) {
                         val velocityTracker = VelocityTracker()
                         detectVerticalDragGestures(
@@ -659,7 +754,6 @@ fun LiquidGlassBottomSheet(
                                 change.consume()
                                 velocityTracker.addPosition(change.uptimeMillis, change.position)
                                 val next = rawDragPx + dragAmount
-                                // Rubber-band resistance (0.18) when pulled past top limit
                                 rawDragPx = if (next < 0f) next * 0.18f else next
                             }
                         )
@@ -671,10 +765,7 @@ fun LiquidGlassBottomSheet(
                     .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
                     .background(
                         Brush.verticalGradient(
-                            listOf(
-                                Color(0xEB291B5C),
-                                Color(0xF2170D38)
-                            )
+                            listOf(Color(0xF5211046), Color(0xFA110828))
                         )
                     )
                     .border(
@@ -706,9 +797,7 @@ fun LiquidGlassBottomSheet(
                     )
                 }
                 Column(
-                    modifier = Modifier.graphicsLayer {
-                        translationY = childFollowThroughPx
-                    },
+                    modifier = Modifier.graphicsLayer { translationY = childFollowThroughPx },
                     content = content
                 )
                 Spacer(modifier = Modifier.height(12.dp))

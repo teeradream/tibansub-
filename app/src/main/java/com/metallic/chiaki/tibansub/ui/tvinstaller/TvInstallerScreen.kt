@@ -12,10 +12,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -60,7 +69,9 @@ fun TvInstallerScreen() {
     var samsungIp by remember { mutableStateOf("") }
     var samsungFallbackDuid by remember { mutableStateOf<String?>(null) }
     var certPassword by remember { mutableStateOf("") }
+    var samsungSession by remember { mutableStateOf(TizenSdbWgtInstaller.getSavedSamsungSession(context)) }
     var hasCert by remember { mutableStateOf(TizenSdbWgtInstaller.hasCustomCertificate(context)) }
+    var issuedDuid by remember { mutableStateOf(TizenSdbWgtInstaller.getIssuedDuid(context)) }
     var showSamsungAccountWeb by remember { mutableStateOf(false) }
 
     var androidTvIp by remember { mutableStateOf("") }
@@ -129,7 +140,7 @@ fun TvInstallerScreen() {
             color = TibanColors.TextSecondary
         )
 
-        // Phone IP Banner (Crucial for Samsung 1-2-3-4-5 Host PC IP!)
+        // Phone IP Banner (Crucial for Samsung 1-2-3-4-5 Host PC IP)
         LiquidGlassCard(
             accentRimColor = TibanColors.AccentGold,
             contentPadding = PaddingValues(14.dp)
@@ -155,9 +166,12 @@ fun TvInstallerScreen() {
                     )
                 }
                 LiquidGlassButton(
-                    text = if (isScanning) "กำลังสแกน..." else "🔍 สแกนหาทีวี",
+                    text = if (isScanning) "กำลังสแกน..." else "สแกนหาทีวี",
                     primaryGlow = false,
                     enabled = !isScanning,
+                    leadingContent = {
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    },
                     onClick = { triggerScan() }
                 )
             }
@@ -204,9 +218,9 @@ fun TvInstallerScreen() {
                             Text(tv.name, fontFamily = TibanPromptFontFamily, fontWeight = FontWeight.Bold, color = Color.White)
                             Text(
                                 text = when {
-                                    tv.isSamsungTizen && tv.sdbDevPortOpen -> "IP: ${tv.ip} • พอร์ต 26101 พร้อมติดตั้ง ✓"
-                                    tv.isSamsungTizen -> "IP: ${tv.ip} • กรุณาเปิดโหมด 1-2-3-4-5 บนทีวี"
-                                    else -> "IP: ${tv.ip} • พอร์ต ADB 5555 พร้อมติดตั้ง ✓"
+                                    tv.isSamsungTizen && tv.sdbDevPortOpen -> "IP: ${tv.ip} | พอร์ต 26101 พร้อมติดตั้ง"
+                                    tv.isSamsungTizen -> "IP: ${tv.ip} | กรุณาเปิดโหมด 1-2-3-4-5 บนทีวี"
+                                    else -> "IP: ${tv.ip} | พอร์ต ADB 5555 พร้อมติดตั้ง"
                                 },
                                 fontFamily = TibanPromptFontFamily,
                                 fontSize = 12.sp,
@@ -226,7 +240,7 @@ fun TvInstallerScreen() {
                 accentRimColor = TibanColors.AccentCyan
             ) {
                 Text(
-                    text = "ติดตั้งลงทีวี Samsung (ไม่ต้องใช้ Apps2Samsung)",
+                    text = "ติดตั้งลงทีวี Samsung ในคลิกเดียว",
                     fontFamily = TibanPromptFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
@@ -236,7 +250,7 @@ fun TvInstallerScreen() {
                 Text(
                     text = "1. เปิดเมนู Apps บนทีวี กดรีโมต 1-2-3-4-5 เปิด Developer Mode: ON แล้วกรอกเลข $phoneWifiIp\n" +
                         "2. กดค้างปุ่มเปิด/ปิดบนรีโมต 5 วินาทีเพื่อให้ทีวีรีสตาร์ท 1 รอบ\n" +
-                        "3. กดปุ่มติดตั้งด้านล่าง แอปจะดึงค่า DUID มา Sign และยิงไฟล์ .wgt เข้าทีวีทันที!",
+                        "3. กดล็อกอิน Samsung Account ด้านล่าง 1 ครั้ง แล้วกดปุ่มติดตั้ง แอปจะดึง DUID ออกใบรับรองและยิงไฟล์ .wgt เข้าทีวีอัตโนมัติ",
                     fontFamily = TibanPromptFontFamily,
                     fontSize = 12.5.sp,
                     lineHeight = 19.sp,
@@ -260,28 +274,76 @@ fun TvInstallerScreen() {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Certificate Auto-Sign / .p12 Backup Box
+                // Samsung Account OAuth & Certificate Status Box
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2B100826))
-                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(14.dp))
+                        .background(Color(0x550C0620))
+                        .border(
+                            1.dp,
+                            if (samsungSession != null || hasCert) TibanColors.AccentMint.copy(alpha = 0.65f)
+                            else Color.White.copy(alpha = 0.24f),
+                            RoundedCornerShape(14.dp)
+                        )
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text = if (hasCert) "✓ มีใบรับรอง Samsung (.p12) พร้อม Auto-Sign DUID แล้ว"
-                        else "ใบรับรอง Auto-Sign DUID (ล็อกอิน Samsung หรือนำเข้า .p12 สำรอง)",
-                        fontFamily = TibanPromptFontFamily,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.5.sp,
-                        color = if (hasCert) TibanColors.AccentMint else Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (samsungSession != null || hasCert) {
+                            Icon(
+                                imageVector = Icons.Rounded.VerifiedUser,
+                                contentDescription = null,
+                                tint = TibanColors.AccentMint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = when {
+                                samsungSession != null -> "ล็อกอิน Samsung แล้ว: ${samsungSession!!.email}"
+                                hasCert && !issuedDuid.isNullOrBlank() -> "มีใบรับรอง Samsung พร้อมใช้แล้ว (DUID: $issuedDuid)"
+                                hasCert -> "มีไฟล์ใบรับรอง .p12 พร้อมใช้งานแล้ว"
+                                else -> "ขั้นตอนสำคัญ: ล็อกอิน Samsung Account เพื่อออกใบรับรองทีวี"
+                            },
+                            fontFamily = TibanPromptFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.5.sp,
+                            color = if (samsungSession != null || hasCert) TibanColors.AccentMint else Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        LiquidGlassButton(
+                            text = if (samsungSession != null) "สลับบัญชี Samsung" else "ล็อกอิน Samsung Account",
+                            primaryGlow = samsungSession == null && !hasCert,
+                            leadingContent = {
+                                Icon(
+                                    Icons.Rounded.Key,
+                                    contentDescription = null,
+                                    tint = if (samsungSession == null && !hasCert) Color(0xFF130A2B) else Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            onClick = { showSamsungAccountWeb = true },
+                            modifier = Modifier.weight(1.25f)
+                        )
+                        LiquidGlassButton(
+                            text = "นำเข้า .p12",
+                            primaryGlow = false,
+                            leadingContent = {
+                                Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            },
+                            onClick = { p12Picker.launch("*/*") },
+                            modifier = Modifier.weight(0.75f)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = certPassword,
                         onValueChange = { certPassword = it },
-                        label = { Text("รหัสผ่านไฟล์ .p12 (กรณีนำเข้าไฟล์สำรอง)", fontFamily = TibanPromptFontFamily, color = Color.White, fontSize = 12.sp) },
+                        label = { Text("รหัสผ่านไฟล์ .p12 (ใช้เฉพาะกรณีนำเข้าไฟล์ .p12 เอง)", fontFamily = TibanPromptFontFamily, color = Color.White, fontSize = 12.sp) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
@@ -291,21 +353,6 @@ fun TvInstallerScreen() {
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        LiquidGlassButton(
-                            text = "🔑 Samsung Login",
-                            primaryGlow = false,
-                            onClick = { showSamsungAccountWeb = true },
-                            modifier = Modifier.weight(1f)
-                        )
-                        LiquidGlassButton(
-                            text = "📂 นำเข้า .p12",
-                            primaryGlow = false,
-                            onClick = { p12Picker.launch("*/*") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
 
                 if (!progressMessage.isNullOrEmpty()) {
@@ -314,7 +361,7 @@ fun TvInstallerScreen() {
                         text = progressMessage!!,
                         fontFamily = TibanPromptFontFamily,
                         fontSize = 13.sp,
-                        color = if (isError) Color(0xFFFF9AA2) else TibanColors.AccentMint,
+                        color = if (isError) TibanColors.ErrorSoft else TibanColors.AccentMint,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -333,7 +380,10 @@ fun TvInstallerScreen() {
                     }
                 } else {
                     LiquidGlassButton(
-                        text = "📺 ติดตั้งลงทีวี Samsung อัตโนมัติ (1-Click)",
+                        text = "ติดตั้งลงทีวี Samsung อัตโนมัติ (1-Click)",
+                        leadingContent = {
+                            Icon(Icons.Rounded.Tv, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(18.dp))
+                        },
                         onClick = {
                             isInstalling = true
                             isError = false
@@ -345,6 +395,8 @@ fun TvInstallerScreen() {
                                     onProgress = { msg -> progressMessage = msg }
                                 )
                                 isInstalling = false
+                                hasCert = TizenSdbWgtInstaller.hasCustomCertificate(context)
+                                issuedDuid = TizenSdbWgtInstaller.getIssuedDuid(context)
                                 res.onSuccess { msg ->
                                     isError = false
                                     progressMessage = msg
@@ -373,8 +425,8 @@ fun TvInstallerScreen() {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "วิธีที่ 1 (ยิงตรงจากมือถือ): เปิด Developer Options > ADB Debugging บนทีวี กรอก IP ทีวีด้านล่างแล้วกดยิงติดตั้งทันที!\n" +
-                        "วิธีที่ 2 (ไม่ต้องเปิด ADB): เปิดแอป Browser หรือ Downloader บนทีวี พิมพ์ลิงก์ http://$phoneWifiIp:${EmbeddedTvPackageServer.PORT}/tv.apk โหลดจากมือถือเครื่องนี้ได้เลย!",
+                    text = "วิธีที่ 1 (ยิงตรงจากมือถือ): เปิด Developer Options > ADB Debugging บนทีวี กรอก IP ทีวีด้านล่างแล้วกดยิงติดตั้งทันที\n" +
+                        "วิธีที่ 2 (ไม่ต้องเปิด ADB): เปิดแอป Browser หรือ Downloader บนทีวี พิมพ์ลิงก์ http://$phoneWifiIp:${EmbeddedTvPackageServer.PORT}/tv.apk โหลดจากมือถือเครื่องนี้ได้เลย",
                     fontFamily = TibanPromptFontFamily,
                     fontSize = 12.5.sp,
                     lineHeight = 19.sp,
@@ -417,7 +469,7 @@ fun TvInstallerScreen() {
                         text = progressMessage!!,
                         fontFamily = TibanPromptFontFamily,
                         fontSize = 13.sp,
-                        color = if (isError) Color(0xFFFF9AA2) else TibanColors.AccentMint,
+                        color = if (isError) TibanColors.ErrorSoft else TibanColors.AccentMint,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -436,7 +488,10 @@ fun TvInstallerScreen() {
                     }
                 } else {
                     LiquidGlassButton(
-                        text = "🚀 ยิงติดตั้ง APK เข้า Android TV ทันที",
+                        text = "ยิงติดตั้ง APK เข้า Android TV ทันที",
+                        leadingContent = {
+                            Icon(Icons.Rounded.RocketLaunch, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(18.dp))
+                        },
                         onClick = {
                             isInstalling = true
                             isError = false
@@ -463,16 +518,24 @@ fun TvInstallerScreen() {
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Box(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2E0F1D30))
+                        .background(Color(0x550C0620))
                         .border(1.dp, TibanColors.AccentCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
                         .padding(12.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Public,
+                        contentDescription = null,
+                        tint = TibanColors.AccentCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "🌐 ลิงก์โหลดผ่าน Wi-Fi บ้านเปิดทำงานอยู่:\nhttp://$phoneWifiIp:${EmbeddedTvPackageServer.PORT}/tv.apk",
+                        text = "ลิงก์โหลดผ่าน Wi-Fi บ้านเปิดทำงานอยู่:\nhttp://$phoneWifiIp:${EmbeddedTvPackageServer.PORT}/tv.apk",
                         fontFamily = TibanPromptFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
@@ -486,13 +549,46 @@ fun TvInstallerScreen() {
     }
 
     if (showSamsungAccountWeb) {
-        SamsungCertSignInWebDialog(onDismiss = { showSamsungAccountWeb = false })
+        SamsungCertSignInWebDialog(
+            onSignedIn = { capturedSession ->
+                TizenSdbWgtInstaller.saveSamsungSession(context, capturedSession)
+                samsungSession = capturedSession
+                showSamsungAccountWeb = false
+                isError = false
+                progressMessage = "ล็อกอิน Samsung Account สำเร็จ (${capturedSession.email}) — กดปุ่ม 'ติดตั้งลงทีวี Samsung อัตโนมัติ' ด้านล่างได้เลย"
+            },
+            onError = { errMsg ->
+                isError = true
+                progressMessage = errMsg
+            },
+            onDismiss = { showSamsungAccountWeb = false }
+        )
     }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun SamsungCertSignInWebDialog(onDismiss: () -> Unit) {
+private fun SamsungCertSignInWebDialog(
+    onSignedIn: (TizenSdbWgtInstaller.SamsungAccountSession) -> Unit,
+    onError: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+
+    // Start local loopback OAuth callback server on 127.0.0.1:4794 matching Samsung's official Tizen Certificate Extension
+    DisposableEffect(Unit) {
+        val server = TizenSdbWgtInstaller.SamsungOAuthCallbackServer(
+            onSessionCaptured = { session ->
+                scope.launch { onSignedIn(session) }
+            },
+            onError = { msg ->
+                scope.launch { onError(msg) }
+            }
+        )
+        server.start()
+        onDispose { server.stop() }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -500,9 +596,9 @@ private fun SamsungCertSignInWebDialog(onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(12.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF140C2E))
+                .background(Color(0xFF130A2B))
                 .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
         ) {
             Row(
@@ -512,14 +608,29 @@ private fun SamsungCertSignInWebDialog(onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Samsung Developer Certificate Portal",
-                    fontFamily = TibanPromptFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color.White
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "ล็อกอิน Samsung Account (ออกใบรับรองทีวี)",
+                        fontFamily = TibanPromptFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color.White
+                    )
+                    Text(
+                        "ล็อกอินเสร็จหน้าต่างนี้จะปิดอัตโนมัติและพร้อมติดตั้งแอปเข้าทีวีทันที",
+                        fontFamily = TibanPromptFontFamily,
+                        fontSize = 11.5.sp,
+                        color = TibanColors.TextMuted
+                    )
+                }
+                LiquidGlassSelectablePill(
+                    label = "ปิด",
+                    selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    },
+                    onClick = onDismiss
                 )
-                LiquidGlassSelectablePill(label = "ปิด ✕", selected = false, onClick = onDismiss)
             }
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -529,11 +640,19 @@ private fun SamsungCertSignInWebDialog(onDismiss: () -> Unit) {
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        CookieManager.getInstance().setAcceptCookie(true)
+                        val wv = this
+                        CookieManager.getInstance().apply {
+                            setAcceptCookie(true)
+                            setAcceptThirdPartyCookies(wv, true)
+                        }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.userAgentString = settings.userAgentString
+                            .replace("; wv", "")
+                            .replace("Version/4.0 ", "")
                         webViewClient = WebViewClient()
-                        loadUrl("https://account.samsung.com/")
+                        loadUrl(TizenSdbWgtInstaller.SAMSUNG_OAUTH_LOGIN_URL)
                     }
                 }
             )

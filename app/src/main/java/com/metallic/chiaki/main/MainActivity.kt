@@ -13,8 +13,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -22,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +35,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.metallic.chiaki.BuildConfig
 import com.metallic.chiaki.common.*
 import com.metallic.chiaki.common.ext.viewModelFactory
 import com.metallic.chiaki.lib.ConnectInfo
@@ -39,6 +46,7 @@ import com.metallic.chiaki.stream.TranslationCacheDb
 import com.metallic.chiaki.tibansub.ui.guide.HowToGuideScreen
 import com.metallic.chiaki.tibansub.ui.home.TibanHomeScreen
 import com.metallic.chiaki.tibansub.ui.pairing.PsGlassyPairingScreen
+import com.metallic.chiaki.tibansub.ui.presettings.AppUpdateUiState
 import com.metallic.chiaki.tibansub.ui.presettings.PreSettingsRepository
 import com.metallic.chiaki.tibansub.ui.presettings.PreSettingsScreen
 import com.metallic.chiaki.tibansub.ui.theme.*
@@ -53,10 +61,10 @@ import kotlinx.coroutines.withContext
 
 /**
  * TIBANSUB Main Hub Activity:
- * - Pure Twilight-to-Sunset Gradient + Glassy V20 + Liquid Glass Motion UI
+ * - Option B (Leonida Twilight Dusk) + Dark Liquid Glass + /liquid-glass-motion spring physics
  * - Supports PlayStation 5 / PS4 (libchiaki backend) AND Xbox Series X|S / One (WebRTC backend)
- * - Pre-Connection Settings Studio, Built-in TV Installer (.wgt & .apk), and Step-by-Step Guides
- * - Launches the preserved classic StreamActivity (main subtitle, left/right popups, and ☰ 3-line menu)
+ * - Settings (AI 7 Providers, Game Subtitle Library Categories, Stream Quality, Version & OTA Update)
+ * - Built-in TV Installer (Samsung .wgt with Official OAuth + Auto-DUID Cert + SDB, Android TV .apk)
  */
 class MainActivity : AppCompatActivity() {
 
@@ -71,6 +79,10 @@ class MainActivity : AppCompatActivity() {
 
     private var refreshSettingsTick = mutableStateOf(0)
     private var cacheCountState = mutableStateOf(15868)
+    private var gameCategoriesState = mutableStateOf<List<TranslationCacheDb.GameCategoryInfo>>(emptyList())
+    private var activeGameIdState = mutableStateOf(TranslationCacheDb.ALL_GAMES_ID)
+    private var pendingImportGameId: String = TranslationCacheDb.DEFAULT_GAME_ID
+    private var updateUiState = mutableStateOf(AppUpdateUiState())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,7 +95,7 @@ class MainActivity : AppCompatActivity() {
         })[MainViewModel::class.java]
 
         preSettingsRepo = PreSettingsRepository(this)
-        refreshCacheCount()
+        refreshCacheMetadata()
 
         lifecycleScope.launch {
             val restored = AppStateBackupManager.autoRestoreIfNeeded(applicationContext)
@@ -98,8 +110,11 @@ class MainActivity : AppCompatActivity() {
                 val hosts by viewModel.displayHosts.observeAsState(emptyList())
                 val tick by refreshSettingsTick
                 val cacheCount by cacheCountState
+                val gameCategories by gameCategoriesState
+                val activeGameId by activeGameIdState
+                val updateState by updateUiState
 
-                var currentTab by remember { mutableStateOf(0) } // 0=Home, 1=PreSettings, 2=TvInstaller, 3=Guide
+                var currentTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings, 2=TvInstaller, 3=Guide
                 var psPairingHostIp by remember { mutableStateOf<String?>(null) }
                 var psPairingManualId by remember { mutableStateOf<Long?>(null) }
                 var showPsPairingOverlay by remember { mutableStateOf(false) }
@@ -108,6 +123,11 @@ class MainActivity : AppCompatActivity() {
                 var preSettings by remember(tick) { mutableStateOf(preSettingsRepo.load()) }
                 val xboxGamertag = remember(showXboxOverlay, tick) {
                     XboxAuthManager(this@MainActivity).getSavedGamertag()
+                }
+
+                val activeGameLabel = remember(activeGameId, gameCategories) {
+                    if (activeGameId == TranslationCacheDb.ALL_GAMES_ID) "ทุกเกม"
+                    else gameCategories.firstOrNull { it.gameId == activeGameId }?.gameName ?: "GTA VI"
                 }
 
                 BackHandler(enabled = showPsPairingOverlay || showXboxOverlay || currentTab != 0) {
@@ -154,6 +174,7 @@ class MainActivity : AppCompatActivity() {
                                         displayHosts = hosts,
                                         xboxGamertag = xboxGamertag,
                                         cacheSentenceCount = cacheCount,
+                                        activeGameLabel = activeGameLabel,
                                         preSettings = preSettings,
                                         onUpdatePreSettings = { next ->
                                             preSettings = next
@@ -180,12 +201,21 @@ class MainActivity : AppCompatActivity() {
                                     1 -> PreSettingsScreen(
                                         snapshot = preSettings,
                                         cacheSentenceCount = cacheCount,
+                                        gameCategories = gameCategories,
+                                        activeGameId = activeGameId,
+                                        appVersionName = BuildConfig.VERSION_NAME,
+                                        updateState = updateState,
                                         onUpdate = { next ->
                                             preSettings = next
                                             preSettingsRepo.save(next)
                                         },
-                                        onImportCacheDb = { pickDatabaseFile() },
+                                        onSelectActiveGame = { gameId -> selectActiveGameCategory(gameId) },
+                                        onAddGameCategory = { name -> addGameCategory(name) },
+                                        onDeleteGameCategory = { gameId -> deleteGameCategory(gameId) },
+                                        onImportCacheDbForGame = { gameId -> pickDatabaseFileForGame(gameId) },
                                         onSyncCloudDb = { syncCloudDatabase() },
+                                        onCheckForUpdate = { checkForAppUpdate() },
+                                        onDownloadUpdate = { rel -> downloadAndInstallUpdate(rel) },
                                         onExportBackup = { exportBackupFile() },
                                         onImportBackup = { importBackupFile() }
                                     )
@@ -201,7 +231,6 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 }
 
-                                // Floating Liquid Glass Bottom Navigation Dock
                                 LiquidGlassBottomDock(
                                     selectedTab = currentTab,
                                     onSelectTab = { currentTab = it },
@@ -226,9 +255,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Reload any changes made via the 3-line (☰) menu during StreamActivity!
         refreshSettingsTick.value++
-        refreshCacheCount()
+        refreshCacheMetadata()
     }
 
     override fun onStop() {
@@ -238,16 +266,116 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshCacheCount() {
+    private fun refreshCacheMetadata() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val db = TranslationCacheDb(applicationContext)
                 val cnt = db.count()
+                val cats = db.listGameCategories()
+                val active = db.getActiveGameId()
                 try { db.close() } catch (_: Exception) {}
                 withContext(Dispatchers.Main) {
                     if (cnt > 0L) cacheCountState.value = cnt.toInt()
+                    gameCategoriesState.value = cats
+                    activeGameIdState.value = active
                 }
             } catch (_: Exception) {}
+        }
+    }
+
+    private fun selectActiveGameCategory(gameId: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = TranslationCacheDb(applicationContext)
+            db.setActiveGameId(gameId)
+            try { db.close() } catch (_: Exception) {}
+            withContext(Dispatchers.Main) {
+                activeGameIdState.value = gameId
+            }
+        }
+    }
+
+    private fun addGameCategory(gameName: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = TranslationCacheDb(applicationContext)
+            val created = db.addGameCategory(gameName)
+            val cats = db.listGameCategories()
+            try { db.close() } catch (_: Exception) {}
+            withContext(Dispatchers.Main) {
+                gameCategoriesState.value = cats
+                Toast.makeText(this@MainActivity, "สร้างหมวดเกม '${created.gameName}' เรียบร้อยแล้ว", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun deleteGameCategory(gameId: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = TranslationCacheDb(applicationContext)
+            db.deleteGameCategory(gameId)
+            val cnt = db.count()
+            val cats = db.listGameCategories()
+            val active = db.getActiveGameId()
+            try { db.close() } catch (_: Exception) {}
+            withContext(Dispatchers.Main) {
+                cacheCountState.value = cnt.toInt()
+                gameCategoriesState.value = cats
+                activeGameIdState.value = active
+                Toast.makeText(this@MainActivity, "ลบหมวดหมู่เกมเรียบร้อยแล้ว", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun checkForAppUpdate() {
+        updateUiState.value = updateUiState.value.copy(
+            isChecking = true,
+            isError = false,
+            statusText = "กำลังตรวจสอบเวอร์ชันล่าสุดจาก GitHub Releases..."
+        )
+        lifecycleScope.launch {
+            val release = AppUpdater.fetchLatestReleaseInfo()
+            if (release == null) {
+                updateUiState.value = updateUiState.value.copy(
+                    isChecking = false,
+                    isError = true,
+                    statusText = "เชื่อมต่อเซิร์ฟเวอร์อัปเดตไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต"
+                )
+            } else if (AppUpdater.isNewerVersion(release.tagName, BuildConfig.VERSION_NAME)) {
+                updateUiState.value = updateUiState.value.copy(
+                    isChecking = false,
+                    isError = false,
+                    availableRelease = release,
+                    statusText = "พบเวอร์ชันใหม่ ${release.tagName} (${release.title}) พร้อมดาวน์โหลดติดตั้งทันที"
+                )
+            } else {
+                updateUiState.value = updateUiState.value.copy(
+                    isChecking = false,
+                    isError = false,
+                    availableRelease = null,
+                    statusText = "คุณใช้เวอร์ชันล่าสุดแล้ว (v${BuildConfig.VERSION_NAME})"
+                )
+            }
+        }
+    }
+
+    private fun downloadAndInstallUpdate(release: AppUpdater.ReleaseInfo) {
+        updateUiState.value = updateUiState.value.copy(
+            isDownloading = true,
+            downloadProgress = 0,
+            isError = false,
+            statusText = "กำลังดาวน์โหลด ${release.tagName}..."
+        )
+        lifecycleScope.launch {
+            val ok = AppUpdater.downloadAndInstallApk(
+                activity = this@MainActivity,
+                apkUrl = release.apkUrl,
+                onProgress = { pct ->
+                    updateUiState.value = updateUiState.value.copy(downloadProgress = pct)
+                }
+            )
+            updateUiState.value = updateUiState.value.copy(
+                isDownloading = false,
+                isError = !ok,
+                statusText = if (ok) "ดาวน์โหลดเสร็จแล้ว กำลังเปิดหน้าติดตั้งอัปเดต..." else "ดาวน์โหลดอัปเดตไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+            )
         }
     }
 
@@ -312,7 +440,8 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "ส่งสัญญาณปลุกเครื่อง ${host.name ?: host.host} แล้ว...", Toast.LENGTH_SHORT).show()
     }
 
-    private fun pickDatabaseFile() {
+    private fun pickDatabaseFileForGame(gameId: String) {
+        pendingImportGameId = gameId
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
@@ -325,13 +454,15 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "กำลังซิงค์คลังซับล่าสุดจากคลาวด์...", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val db = TranslationCacheDb(applicationContext)
-            val added = AppUpdater.syncCloudSubtitleDatabase(this@MainActivity, db)
+            val added = AppUpdater.syncCloudSubtitleDatabase(this@MainActivity, db, TranslationCacheDb.DEFAULT_GAME_ID)
             val total = db.count()
+            val cats = db.listGameCategories()
             try { db.close() } catch (_: Exception) {}
             if (total > 0L) cacheCountState.value = total.toInt()
+            gameCategoriesState.value = cats
             Toast.makeText(
                 this@MainActivity,
-                if (added > 0) "ซิงค์สำเร็จ! รวมในเครื่อง $total ประโยค" else "ซิงค์ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต",
+                if (added > 0) "ซิงค์สำเร็จ รวมในเครื่อง $total ประโยค" else "ซิงค์ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -363,16 +494,20 @@ class MainActivity : AppCompatActivity() {
         val uri = data?.data ?: return
         when (requestCode) {
             REQUEST_CODE_IMPORT_CACHE_DB -> {
+                val targetGame = pendingImportGameId
                 lifecycleScope.launch {
                     val db = TranslationCacheDb(applicationContext)
-                    val imported = withContext(Dispatchers.IO) { db.importFromUri(this@MainActivity, uri) }
+                    val imported = withContext(Dispatchers.IO) { db.importFromUri(this@MainActivity, uri, targetGame) }
                     val total = withContext(Dispatchers.IO) { db.count() }
+                    val cats = withContext(Dispatchers.IO) { db.listGameCategories() }
                     try { db.close() } catch (_: Exception) {}
                     if (total > 0L) cacheCountState.value = total.toInt()
+                    gameCategoriesState.value = cats
+                    val gameLabel = cats.firstOrNull { it.gameId == targetGame }?.gameName ?: targetGame
                     Toast.makeText(
                         this@MainActivity,
-                        if (imported > 0) "นำเข้าคลังซับสำเร็จ $imported ประโยค! (รวม $total ประโยค)"
-                        else "ไม่สามารถนำเข้าไฟล์นี้ได้ (รองรับ .db และ .tsv)",
+                        if (imported > 0) "นำเข้าคลังซับเข้าหมวด '$gameLabel' สำเร็จ $imported ประโยค (รวม $total ประโยค)"
+                        else "ไม่สามารถนำเข้าไฟล์นี้ได้ (รองรับไฟล์ .db, .tsv หรือ .txt คั่นด้วยแท็บ)",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -382,7 +517,7 @@ class MainActivity : AppCompatActivity() {
                     val ok = AppStateBackupManager.exportToUri(this@MainActivity, uri)
                     Toast.makeText(
                         this@MainActivity,
-                        if (ok) "สำรองข้อมูลสำเร็จแล้ว!" else "สำรองข้อมูลไม่สำเร็จ",
+                        if (ok) "สำรองข้อมูลสำเร็จแล้ว" else "สำรองข้อมูลไม่สำเร็จ",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -393,7 +528,7 @@ class MainActivity : AppCompatActivity() {
                     refreshSettingsTick.value++
                     Toast.makeText(
                         this@MainActivity,
-                        if (ok) "กู้คืนการตั้งค่าและข้อมูลคอนโซลสำเร็จแล้ว!" else "ไฟล์สำรองไม่ถูกต้อง",
+                        if (ok) "กู้คืนการตั้งค่าและข้อมูลคอนโซลสำเร็จแล้ว" else "ไฟล์สำรองไม่ถูกต้อง",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -402,6 +537,11 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+private data class DockTabItem(
+    val icon: ImageVector,
+    val label: String
+)
+
 @Composable
 private fun LiquidGlassBottomDock(
     selectedTab: Int,
@@ -409,40 +549,46 @@ private fun LiquidGlassBottomDock(
     modifier: Modifier = Modifier
 ) {
     val items = listOf(
-        "🏠" to "หน้าหลัก",
-        "⚙️" to "ตั้งค่าล่วงหน้า",
-        "📺" to "ติดตั้งทีวี",
-        "📖" to "วิธีใช้งาน"
+        DockTabItem(Icons.Rounded.Home, "หน้าหลัก"),
+        DockTabItem(Icons.Rounded.Settings, "ตั้งค่า"),
+        DockTabItem(Icons.Rounded.Tv, "ติดตั้งทีวี"),
+        DockTabItem(Icons.Rounded.MenuBook, "วิธีใช้งาน")
     )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0x66140A30))
-            .border(1.2.dp, Color.White.copy(alpha = 0.48f), RoundedCornerShape(24.dp))
+            .background(Color(0xD4130A2B))
+            .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
             .padding(horizontal = 8.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items.forEachIndexed { index, (icon, label) ->
+        items.forEachIndexed { index, item ->
             val isSelected = selectedTab == index
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) Color.White.copy(alpha = 0.88f) else Color.Transparent)
+                    .background(if (isSelected) Color.White.copy(alpha = 0.92f) else Color.Transparent)
                     .clickable { onSelectTab(index) }
                     .padding(vertical = 7.dp, horizontal = 4.dp)
             ) {
-                Text(text = icon, fontSize = 15.sp)
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = item.label,
+                    tint = if (isSelected) Color(0xFF130A2B) else Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = label,
+                    text = item.label,
                     fontFamily = TibanPromptFontFamily,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     fontSize = 11.5.sp,
-                    color = if (isSelected) Color(0xFF1A103D) else Color.White
+                    color = if (isSelected) Color(0xFF130A2B) else Color.White
                 )
             }
         }

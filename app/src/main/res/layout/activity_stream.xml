@@ -849,6 +849,40 @@
             android:insetBottom="0dp"/>
     </LinearLayout>
 
+    <!-- Floating Back Button (Top-Left Frosted Capsule) -->
+    <LinearLayout
+        android:id="@+id/btnStreamBack"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_stream_back_pill"
+        android:paddingStart="10dp"
+        android:paddingEnd="14dp"
+        android:elevation="10dp"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/ic_arrow_back_white"
+            android:contentDescription="ย้อนกลับ"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="ย้อนกลับ"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:fontFamily="@font/gta_prompt_semibold"/>
+    </LinearLayout>
+
     <!-- Floating Circular Button with 3 lines (Hamburger Menu) -->
     <ImageButton
         android:id="@+id/btnMenuToggle"

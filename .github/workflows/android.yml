@@ -86,11 +86,12 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: "TIBANSUB ${{ steps.ver.outputs.tag }} (PS5/PS4 + Xbox All-in-One Translator & Built-in TV Installer)"
           body: |
-            ### 🎮 TIBANSUB ${{ steps.ver.outputs.tag }} — All-in-One Console Translator
-            - **รองรับทั้ง PlayStation 5 / PS4 (`libchiaki`) และ Xbox Series X|S / One (`WebRTC`) ในแอปเดียว**
-            - **ดีไซน์ใหม่ Glassy V20 × Liquid Glass Motion บนโทนสี Twilight-to-Sunset** พร้อมฟอนต์ `GTA Art Deco + Prompt`
-            - **ฝังไฟล์ติดตั้งทีวีทั้ง Samsung (`.wgt` Auto-Sign) และ Android TV (`.apk` Wireless ADB) ไว้ในแอปมือถือครบจบในไฟล์เดียว**
-            - **คงหน้าจอซับหลัก, กล่องข้อความแนะนำซ้าย, แชทมือถือขวา และเมนูขีดสามขีด (`☰`) แบบต้นฉบับครบ 100%**
+            ### TIBANSUB ${{ steps.ver.outputs.tag }} — All-in-One Console Translator
+            - **แก้ไขระบบล็อกอิน PSN Account ID อัตโนมัติ** (OAuth Secret & Endpoint ที่ถูกต้องตามมาตรฐาน Remote Play)
+            - **แก้ไขระบบล็อกอิน Samsung Account และติดตั้ง `.wgt` เข้าทีวี Samsung** (Official OAuth Callback + ออกใบรับรอง DUID อัตโนมัติ + `vd_appinstall`)
+            - **ธีมใหม่ Option B (Leonida Twilight Dusk)** + ไอคอนใหม่ Retro-Neon Gamepad + โลโก้เวกเตอร์ PlayStation & Xbox + ลบอิโมจิทั้งหมด
+            - **หน้า "ตั้งค่า" ใหม่** เพิ่มเลขเวอร์ชัน ปุ่มเช็กอัปเดต และระบบแยกหมวดหมู่คลังซับของเกมพร้อมนำเข้าไฟล์ซับ (.db/.tsv) แยกแต่ละเกม
+            - **เพิ่มปุ่ม `< ย้อนกลับ` มุมซ้ายบนในหน้าสตรีม** พร้อมคงหน้าจอซับหลัก ป๊อปอัพซ้าย/ขวา และเมนูสามขีด (`☰`) แบบต้นฉบับครบ 100%
           files: |
             dist/*.apk
             dist/*.wgt

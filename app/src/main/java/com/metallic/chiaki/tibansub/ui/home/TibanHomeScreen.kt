@@ -9,6 +9,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -16,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +41,7 @@ fun TibanHomeScreen(
     displayHosts: List<DisplayHost>,
     xboxGamertag: String,
     cacheSentenceCount: Int,
+    activeGameLabel: String,
     preSettings: PreSettingsSnapshot,
     onUpdatePreSettings: (PreSettingsSnapshot) -> Unit,
     onConnectPsHost: (DisplayHost) -> Unit,
@@ -57,46 +65,22 @@ fun TibanHomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Brand Header: Squircle TIBANSUB Badge + Wordmark
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(top = 6.dp)
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.tibansub_logo_badge),
-                contentDescription = "TIBANSUB Logo",
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "TIBANSUB",
-                fontFamily = TibanPromptFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                letterSpacing = 1.5.sp,
-                color = Color.White
-            )
-        }
-
-        // Cache DB Pill
-        Box(
+        // Brand Header: Prominent User-Approved Retro-Neon Gamepad App Icon
+        Image(
+            painter = painterResource(id = R.drawable.tibansub_logo_badge),
+            contentDescription = "TIBANSUB",
             modifier = Modifier
-                .clip(CircleShape)
-                .background(Color(0x33140A30))
-                .border(1.dp, Color.White.copy(alpha = 0.42f), CircleShape)
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = "คลังซับในเครื่อง: %,d ประโยค • 0ms".format(cacheSentenceCount),
-                fontFamily = TibanPromptFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.5.sp,
-                color = Color.White
-            )
-        }
+                .padding(top = 4.dp)
+                .size(92.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .border(
+                    width = 1.4.dp,
+                    brush = Brush.linearGradient(
+                        listOf(TibanColors.AccentCyan.copy(alpha = 0.7f), TibanColors.AccentPink.copy(alpha = 0.7f))
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                )
+        )
 
         // 1. PlayStation 5 / PS4 Console Card (libchiaki Backend)
         LiquidGlassCard(
@@ -116,18 +100,19 @@ fun TibanHomeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .border(1.2.dp, Color.White.copy(alpha = 0.65f), RoundedCornerShape(15.dp)),
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0x4D006FCD), Color(0x4D3BF0FF))
+                            )
+                        )
+                        .border(1.2.dp, TibanColors.AccentCyan.copy(alpha = 0.75f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "PS",
-                        fontFamily = TibanPromptFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        color = Color.White
+                    PlayStationLogoIcon(
+                        modifier = Modifier.size(32.dp, 24.dp),
+                        tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
@@ -143,11 +128,11 @@ fun TibanHomeScreen(
                         primaryPsHost != null && primaryPsHost.isRegistered -> {
                             val name = primaryPsHost.name ?: primaryPsHost.host
                             val standby = (primaryPsHost as? DiscoveredDisplayHost)?.discoveredHost?.state == DiscoveryHost.State.STANDBY
-                            if (standby) "$name • โหมดพักเครื่อง (แตะเพื่อปลุก)"
-                            else "$name • พร้อมแปลภาษา ✓"
+                            if (standby) "$name | โหมดพักเครื่อง (แตะเพื่อปลุก)"
+                            else "$name | พร้อมแปลภาษา"
                         }
-                        primaryPsHost != null -> "พบเครื่อง ${primaryPsHost.name ?: primaryPsHost.host} • แตะเพื่อจับคู่ครั้งแรก"
-                        else -> "ค้นหาอัตโนมัติใน Wi-Fi • แตะเพื่อจับคู่ PIN 8 หลัก"
+                        primaryPsHost != null -> "พบเครื่อง ${primaryPsHost.name ?: primaryPsHost.host} | แตะเพื่อจับคู่ครั้งแรก"
+                        else -> "ค้นหาอัตโนมัติใน Wi-Fi | แตะเพื่อจับคู่ PIN 8 หลัก"
                     }
                     Text(
                         text = psStatusText,
@@ -156,9 +141,15 @@ fun TibanHomeScreen(
                         color = if (primaryPsHost?.isRegistered == true) TibanColors.AccentMint else TibanColors.TextSecondary
                     )
                 }
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
-            // Show discovered / saved PS consoles list + quick actions
+            // Discovered / saved PS consoles list + quick actions
             if (displayHosts.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 displayHosts.forEach { host ->
@@ -170,7 +161,7 @@ fun TibanHomeScreen(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0x2E0E0824))
+                            .background(Color(0x550C0620))
                             .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(14.dp))
                             .clickable { onConnectPsHost(host) }
                             .padding(horizontal = 12.dp, vertical = 9.dp)
@@ -184,7 +175,7 @@ fun TibanHomeScreen(
                                 color = Color.White
                             )
                             Text(
-                                text = "IP: ${host.host} • ${if (host.isRegistered) "จับคู่ถาวรแล้ว" else "ยังไม่จับคู่"}",
+                                text = "IP: ${host.host} | ${if (host.isRegistered) "จับคู่ถาวรแล้ว" else "ยังไม่จับคู่"}",
                                 fontFamily = TibanPromptFontFamily,
                                 fontSize = 11.5.sp,
                                 color = TibanColors.TextMuted
@@ -206,7 +197,7 @@ fun TibanHomeScreen(
                                 )
                             }
                             LiquidGlassSelectablePill(
-                                label = if (host.isRegistered) "เข้าแปล →" else "จับคู่",
+                                label = if (host.isRegistered) "เข้าแปล" else "จับคู่",
                                 selected = true,
                                 onClick = { onConnectPsHost(host) }
                             )
@@ -218,14 +209,20 @@ fun TibanHomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 LiquidGlassSelectablePill(
-                    label = "+ จับคู่เครื่องใหม่ (PIN)",
+                    label = "จับคู่เครื่องใหม่ (PIN)",
                     selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    },
                     onClick = { onOpenPsPairing(primaryPsHost?.host) },
                     modifier = Modifier.weight(1f)
                 )
                 LiquidGlassSelectablePill(
-                    label = "+ เพิ่ม IP เครื่องเอง",
+                    label = "เพิ่ม IP เครื่องเอง",
                     selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    },
                     onClick = { showAddIpSheet = true },
                     modifier = Modifier.weight(1f)
                 )
@@ -244,18 +241,19 @@ fun TibanHomeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .border(1.2.dp, TibanColors.AccentMint.copy(alpha = 0.75f), RoundedCornerShape(15.dp)),
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0x4D107C10), Color(0x4D28FFA5))
+                            )
+                        )
+                        .border(1.2.dp, TibanColors.AccentMint.copy(alpha = 0.78f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "XB",
-                        fontFamily = TibanPromptFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
-                        color = Color.White
+                    XboxLogoIcon(
+                        modifier = Modifier.size(28.dp),
+                        tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
@@ -268,20 +266,25 @@ fun TibanHomeScreen(
                         color = Color.White
                     )
                     Text(
-                        text = if (xboxGamertag.isNotBlank()) "บัญชีที่เชื่อมไว้: $xboxGamertag • พร้อมเชื่อมต่อ ✓"
-                        else "Xbox Remote Play • แตะเพื่อล็อกอินบัญชี Microsoft",
+                        text = if (xboxGamertag.isNotBlank()) "บัญชีที่เชื่อมไว้: $xboxGamertag | พร้อมเชื่อมต่อ"
+                        else "Xbox Remote Play | แตะเพื่อล็อกอินบัญชี Microsoft",
                         fontFamily = TibanPromptFontFamily,
                         fontSize = 12.5.sp,
                         color = if (xboxGamertag.isNotBlank()) TibanColors.AccentMint else TibanColors.TextSecondary
                     )
                 }
-                Text("→", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
-        // 3. Pre-Connection Settings Summary Card (Instant Toggles + Shortcut to Full Studio)
+        // 3. Quick Settings Summary Card
         LiquidGlassCard(
-            accentRimColor = Color.White,
+            accentRimColor = TibanColors.AccentPink,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -290,15 +293,18 @@ fun TibanHomeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "สถานะตั้งค่าก่อนเริ่มเชื่อมต่อ",
+                    text = "สถานะการตั้งค่าปัจจุบัน",
                     fontFamily = TibanPromptFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = Color.White
                 )
                 LiquidGlassSelectablePill(
-                    label = "ปรับละเอียด ⚙",
+                    label = "ตั้งค่า",
                     selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    },
                     onClick = { onNavigateTab(1) }
                 )
             }
@@ -309,8 +315,8 @@ fun TibanHomeScreen(
                 value = "${preSettings.activeProvider.displayName}${if (preSettings.localCacheEnabled) " + 0ms DB" else ""}"
             )
             SummaryStatusRow(
-                label = "ซับไตเติล & ป๊อปอัพ",
-                value = "ขนาด ${preSettings.subFontSizeSp}sp • ${if (preSettings.popupZonesMode) "เปิดซ้าย/ขวา" else "เฉพาะซับหลัก"}"
+                label = "หมวดคลังซับเกม",
+                value = activeGameLabel
             )
 
             LiquidGlassToggleRow(
@@ -339,10 +345,36 @@ fun TibanHomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(90.dp))
+        // Local Subtitle Cache Pill positioned right above Bottom Dock (per user Figma layout)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(Color(0x88130A2B))
+                .border(1.dp, Color.White.copy(alpha = 0.40f), CircleShape)
+                .clickable { onNavigateTab(1) }
+                .padding(horizontal = 16.dp, vertical = 7.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Storage,
+                contentDescription = null,
+                tint = TibanColors.AccentCyan,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(7.dp))
+            Text(
+                text = "คลังซับในเครื่อง: %,d ประโยค | 0ms ($activeGameLabel)".format(cacheSentenceCount),
+                fontFamily = TibanPromptFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                color = Color.White
+            )
+        }
+
+        Spacer(modifier = Modifier.height(86.dp))
     }
 
-    // Velocity-Aware Liquid Glass Sheet for Manual PS5/PS4 IP Entry
     LiquidGlassBottomSheet(
         visible = showAddIpSheet,
         onDismiss = { showAddIpSheet = false },

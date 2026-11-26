@@ -13,40 +13,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.metallic.chiaki.R
 
-// Pure Twilight-to-Sunset Color Palette (from user reference — smooth colors only, zero trees/icons)
+// Option B: Leonida Twilight Dusk (GTA VI Dusk Palette — high-contrast Dark Liquid Glass)
 object TibanColors {
-    val IndigoDeep = Color(0xFF1D2B9E)
-    val IndigoRoyal = Color(0xFF3935BE)
-    val VioletElectric = Color(0xFF8A3FD9)
-    val MagentaVibrant = Color(0xFFF544C2)
-    val CoralPeach = Color(0xFFFF7D6E)
-    val SunsetAmber = Color(0xFFFFA659)
-    val GoldenSun = Color(0xFFFFC758)
+    val TwilightNight = Color(0xFF090E2E)
+    val DeepPlum = Color(0xFF211046)
+    val DeepNeonBerry = Color(0xFF661A5E)
+    val WarmSunset = Color(0xFFB5425A)
+    val HorizonAmber = Color(0xFFD97A4A)
 
-    // Glassy V20 surface & border tokens
-    val GlassFillDark = Color(0x47120A2A)
-    val GlassFillLight = Color(0x26FFFFFF)
+    // Dark Liquid Glass surface & border tokens
+    val GlassFillDark = Color(0xB8130A2B)
+    val GlassFillMid = Color(0x8C170C36)
+    val GlassFillLight = Color(0x28FFFFFF)
     val GlassPillActive = Color(0x3DFFFFFF)
-    val GlassBorderBright = Color(0x99FFFFFF)
-    val GlassBorderSoft = Color(0x33FFFFFF)
-    val GlassInnerTopGlow = Color(0x73FFFFFF)
+    val GlassBorderBright = Color(0x8CFFFFFF)
+    val GlassBorderSoft = Color(0x38FFFFFF)
+    val GlassInnerTopGlow = Color(0x66FFFFFF)
 
     // Accent status colors
     val AccentCyan = Color(0xFF3BF0FF)
     val AccentMint = Color(0xFF28FFA5)
     val AccentPink = Color(0xFFFF4FB8)
-    val AccentGold = Color(0xFFFFD166)
+    val AccentGold = Color(0xFFFFB86C)
+    val ErrorSoft = Color(0xFFFF9AA2)
     val TextPrimary = Color(0xFFFFFFFF)
-    val TextSecondary = Color(0xE0F6EEFF)
-    val TextMuted = Color(0xB8EAD8FF)
+    val TextSecondary = Color(0xE0F4EBFF)
+    val TextMuted = Color(0xB8DFD0F5)
 
-    val SunsetWallpaperBrush: Brush = Brush.linearGradient(
-        0.00f to IndigoDeep,
-        0.22f to IndigoRoyal,
-        0.44f to VioletElectric,
-        0.64f to MagentaVibrant,
-        0.83f to CoralPeach,
-        1.00f to GoldenSun
+    val SunsetWallpaperBrush: Brush = Brush.verticalGradient(
+        0.00f to TwilightNight,
+        0.26f to DeepPlum,
+        0.54f to DeepNeonBerry,
+        0.79f to WarmSunset,
+        1.00f to HorizonAmber
     )
 
     val PrimaryActionBrush: Brush = Brush.horizontalGradient(
@@ -54,13 +53,6 @@ object TibanColors {
             Color(0xFF4BE8FF),
             Color(0xFFFF55C8),
             Color(0xFFFFA95B)
-        )
-    )
-
-    val SubtleActionBrush: Brush = Brush.horizontalGradient(
-        listOf(
-            Color(0x59FFFFFF),
-            Color(0x38FFDDF5)
         )
     )
 }
@@ -128,11 +120,11 @@ val TibanTypography = Typography(
 
 private val TibanColorScheme = darkColorScheme(
     primary = TibanColors.AccentCyan,
-    secondary = TibanColors.MagentaVibrant,
-    tertiary = TibanColors.GoldenSun,
-    background = TibanColors.IndigoDeep,
+    secondary = TibanColors.AccentPink,
+    tertiary = TibanColors.AccentGold,
+    background = TibanColors.TwilightNight,
     surface = TibanColors.GlassFillDark,
-    onPrimary = Color(0xFF0A0618),
+    onPrimary = Color(0xFF090E2E),
     onSecondary = Color.White,
     onBackground = Color.White,
     onSurface = Color.White

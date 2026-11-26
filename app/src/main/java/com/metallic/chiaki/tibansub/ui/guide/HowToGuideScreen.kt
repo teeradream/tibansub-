@@ -8,6 +8,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,13 +58,13 @@ fun HowToGuideScreen(
             ),
             GuideStep(
                 "03",
-                "ดึง PSN ID อัตโนมัติ & กรอก PIN ในแอป TIBANSUB",
-                "กดการ์ด PlayStation ในหน้าหลัก แตะปุ่ม 'ดึงรหัส PSN ID ในแอป' (ล็อกอิน Account B หรือค้นหาชื่อ PSN) แล้วกรอกตัวเลข 8 หลักลงในช่องแก้ว Glassy PIN กดยืนยันครั้งเดียวจำถาวร!"
+                "ล็อกอิน PSN ดึงรหัสอัตโนมัติ & กรอก PIN ในแอป TIBANSUB",
+                "กดการ์ด PlayStation ในหน้าหลัก แตะปุ่ม 'ล็อกอิน PSN ดึงอัตโนมัติ' (ใช้ Account B) แอปจะดึงรหัส PSN Account ID แปลงเป็น Base64 ให้ทันที แล้วกรอกตัวเลข 8 หลักลงช่อง PIN กดยืนยันครั้งเดียวจำถาวร"
             ),
             GuideStep(
                 "04",
                 "เข้าเล่นจริงบนทีวี 4K พร้อมซับไทย & เสียงพากย์",
-                "กดเชื่อมเครื่อง PS5 ในแอป TIBANSUB จากนั้นหยิบจอย DualSense กดปุ่ม PS สลับกลับเข้า Account A (ไอดีหลัก) แล้วเล่นบนทีวีได้ตามปกติ แอปจะแปลซับและพากย์ไทยให้ต่อเนื่องทันที!"
+                "กดเชื่อมเครื่อง PS5 ในแอป TIBANSUB จากนั้นหยิบจอย DualSense กดปุ่ม PS สลับกลับเข้า Account A (ไอดีหลัก) แล้วเล่นบนทีวีได้ตามปกติ แอปจะแปลซับและพากย์ไทยให้ต่อเนื่องทันที"
             )
         )
         1 -> listOf(
@@ -78,31 +81,31 @@ fun HowToGuideScreen(
             GuideStep(
                 "03",
                 "เลือกเครื่อง Xbox ในบ้านแล้วเริ่มแปลทันที",
-                "แตะชื่อเครื่อง Xbox ที่ตรวจพบ แอปจะเชื่อมต่อภาพสตรีมหลังบ้านเข้าสู่หน้าจอซับหลัก ป๊อปอัพซ้าย/ขวา เสียงพากย์ไทย และเมนูขีดสามขีด (☰) เหมือนฝั่ง PS5 ทุกประการ!"
+                "แตะชื่อเครื่อง Xbox ที่ตรวจพบ แอปจะเชื่อมต่อภาพสตรีมหลังบ้านเข้าสู่หน้าจอซับหลัก ป๊อปอัพซ้าย/ขวา เสียงพากย์ไทย และเมนูขีดสามขีด (☰) เหมือนฝั่ง PS5 ทุกประการ"
             )
         )
         2 -> listOf(
             GuideStep(
                 "01",
                 "แอปทีวีทั้ง Samsung (.wgt) และ Android TV (.apk) ฝังอยู่ในตัวแล้ว",
-                "ไม่ต้องโหลดไฟล์แยกจากเว็บ หรือใช้แฟลชไดรฟ์ เพียงเชื่อมต่อมือถือและทีวีในวง Wi-Fi เดียวกัน แล้วเปิดแท็บ 'ติดตั้งแอปทีวี' ด้านล่าง"
+                "ไม่ต้องโหลดไฟล์แยกจากเว็บ หรือใช้แฟลชไดรฟ์ เพียงเชื่อมต่อมือถือและทีวีในวง Wi-Fi เดียวกัน แล้วเปิดแท็บ 'ติดตั้งทีวี' ด้านล่าง"
             ),
             GuideStep(
                 "02",
                 "สำหรับทีวี Samsung (Tizen 2018 ขึ้นไป)",
-                "เปิดหน้า Apps บนทีวี กดรีโมตปุ่มตัวเลข 1-2-3-4-5 เปิด Developer Mode เป็น ON แล้วกรอกเลข IP มือถือที่แสดงในแอป จากนั้นกดค้างปุ่มปิดทีวี 5 วินาทีเพื่อรีสตาร์ท แล้วกดปุ่ม 'ติดตั้งลงทีวี Samsung อัตโนมัติ' ในแอปได้เลย (มีระบบ Auto-Sign DUID ในตัว ไม่ต้องใช้ Apps2Samsung)"
+                "เปิดหน้า Apps บนทีวี กดรีโมตปุ่มตัวเลข 1-2-3-4-5 เปิด Developer Mode เป็น ON แล้วกรอกเลข IP มือถือที่แสดงในแอป จากนั้นกดค้างปุ่มปิดทีวี 5 วินาทีเพื่อรีสตาร์ท กลับมาในแอป กดล็อกอิน Samsung Account 1 ครั้ง แล้วกดปุ่ม 'ติดตั้งลงทีวี Samsung อัตโนมัติ' แอปจะขอใบรับรอง DUID และติดตั้งให้เสร็จทันที"
             ),
             GuideStep(
                 "03",
                 "สำหรับทีวี Android TV / Google TV (Sony, TCL, Hisense, Xiaomi, Box)",
-                "เปิด Developer Options > Wireless Debugging บนทีวี ดูเลขจับคู่ 6 หลัก แล้วนำมากรอกในแท็บ Android TV ของแอป TIBANSUB กดยิงติดตั้ง APK เข้าทีวีเสร็จในคลิกเดียว! (หรือโหลดผ่านลิงก์ Wi-Fi ในบ้านก็ได้)"
+                "เปิด Developer Options > ADB Debugging บนทีวี แล้วกรอกเลข IP ทีวีในแท็บ Android TV ของแอป TIBANSUB กดยิงติดตั้ง APK เข้าทีวีเสร็จในคลิกเดียว หรือเปิดลิงก์ Wi-Fi ในบ้านเพื่อโหลดตรงเข้าทีวีก็ได้"
             )
         )
         else -> listOf(
             GuideStep(
                 "01",
-                "ปุ่มเมนูขีดสามขีด (☰) มุมขวาบน",
-                "ขณะเชื่อมต่อเข้าเกมแล้ว แตะปุ่มวงกลมสามขีด (☰) มุมขวาบนเพื่อปรับขนาด/สีซับ, กรอบสแกนซับ, เสียงพากย์ไทย, เลือกค่าย AI และซิงค์คลังซับสดๆ แบบ PS-Translator เดิมครบ 100%"
+                "ปุ่มเมนูขีดสามขีด (☰) มุมขวาบน & ปุ่มย้อนกลับมุมซ้ายบน",
+                "ขณะเชื่อมต่อเข้าเกมแล้ว แตะปุ่มวงกลมสามขีด (☰) มุมขวาบนเพื่อปรับขนาด/สีซับ กรอบสแกนซับ เสียงพากย์ไทย และค่าย AI แบบสดๆ หรือแตะปุ่ม '< ย้อนกลับ' มุมซ้ายบนเพื่อออกจากหน้าสตรีมกลับหน้าหลักได้ทันที"
             ),
             GuideStep(
                 "02",
@@ -112,7 +115,7 @@ fun HowToGuideScreen(
             GuideStep(
                 "03",
                 "ปุ่มลัดมุมขวาล่าง & ถาดด่วนขอบบน",
-                "ปัดขอบบนลงมาเพื่อสลับ พากย์/เสียงเกม/ซับ/ป๊อปอัพ อย่างรวดเร็ว หรือกดปุ่ม 📺 มุมขวาล่างเพื่อเข้า 'โหมดทีวีจอดำสนิท 100%' วางมือถือพักไว้ข้างๆ ทีวีได้เลย (แตะจอ 2 ครั้งเพื่อออก)"
+                "ปัดขอบบนลงมาเพื่อสลับ พากย์/เสียงเกม/ซับ/ป๊อปอัพ อย่างรวดเร็ว หรือกดปุ่มโหมดทีวีจอดำมุมขวาล่างเพื่อวางมือถือพักไว้ข้างทีวี (แตะจอ 2 ครั้งเพื่อออก)"
             )
         )
     }
@@ -158,7 +161,7 @@ fun HowToGuideScreen(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.22f))
+                            .background(Color.White.copy(alpha = 0.20f))
                             .border(1.dp, Color.White.copy(alpha = 0.65f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -189,7 +192,8 @@ fun HowToGuideScreen(
                         )
                         if (!step.tip.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Box(
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
@@ -197,8 +201,15 @@ fun HowToGuideScreen(
                                     .border(1.dp, TibanColors.AccentCyan.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
                                     .padding(horizontal = 10.dp, vertical = 7.dp)
                             ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Lightbulb,
+                                    contentDescription = null,
+                                    tint = TibanColors.AccentGold,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(7.dp))
                                 Text(
-                                    text = "💡 ทริค: ${step.tip}",
+                                    text = "ทริค: ${step.tip}",
                                     fontFamily = TibanPromptFontFamily,
                                     fontSize = 12.sp,
                                     color = Color.White
@@ -212,17 +223,17 @@ fun HowToGuideScreen(
 
         when (selectedCategory) {
             0 -> LiquidGlassButton(
-                text = "ไปหน้าจับคู่ PlayStation 5 / PS4 ทันที →",
+                text = "ไปหน้าจับคู่ PlayStation 5 / PS4 ทันที",
                 onClick = onJumpToPsPairing,
                 modifier = Modifier.fillMaxWidth()
             )
             1 -> LiquidGlassButton(
-                text = "ไปหน้าเชื่อมต่อเครื่อง Xbox ทันที →",
+                text = "ไปหน้าเชื่อมต่อเครื่อง Xbox ทันที",
                 onClick = onJumpToXboxConnect,
                 modifier = Modifier.fillMaxWidth()
             )
             2 -> LiquidGlassButton(
-                text = "เปิดหน้าติดตั้งแอปลงทีวีในตัว →",
+                text = "เปิดหน้าติดตั้งแอปลงทีวีในตัว",
                 onClick = onJumpToTvInstaller,
                 modifier = Modifier.fillMaxWidth()
             )

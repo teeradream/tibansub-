@@ -15,13 +15,13 @@ import kotlin.math.min
 
 /**
  * High-speed on-device SQLite translation cache with:
- * 1. Strict separation between Popup/Tutorial tips (*_pop) and Dialogue Subtitles (*_sub)
- *    so subtitle translations are NEVER used for tutorial/popup boxes.
- * 2. Exact normalized text lookup (0ms)
- * 3. OCR-invariant skeleton lookup (collapses I/l/1, O/0, punctuation & spacing differences in O(1))
- * 4. Exact full-row Levenshtein fuzzy matching (>= 90% similarity, length >= 15) for minor live-OCR character noise
- * 5. Speaker-prefix decomposition ("Lucia: ..." <-> bare dialogue)
- * 6. External .db / .tsv file import support
+ * 1. Game Subtitle Library Categories (e.g. GTA VI + user-added game packs, per-game import & filtering)
+ * 2. Strict separation between Popup/Tutorial tips (*_pop) and Dialogue Subtitles (*_sub)
+ * 3. Exact normalized text lookup (0ms)
+ * 4. OCR-invariant skeleton lookup (collapses I/l/1, O/0, punctuation & spacing differences in O(1))
+ * 5. Exact full-row Levenshtein fuzzy matching (>= 90% similarity, length >= 15)
+ * 6. Speaker-prefix decomposition ("Lucia: ..." <-> bare dialogue)
+ * 7. External .db / .tsv file import into any chosen game category
  */
 class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 	appContext.applicationContext,
@@ -29,15 +29,27 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 	null,
 	DB_VERSION
 ) {
+	data class GameCategoryInfo(
+		val gameId: String,
+		val gameName: String,
+		val sentenceCount: Int,
+		val isBuiltIn: Boolean
+	)
+
 	companion object {
 		private const val DB_NAME = "ps_translator_cache.db"
-		private const val DB_VERSION = 1
+		private const val DB_VERSION = 2
 		private const val TABLE_NAME = "translation_cache"
+		private const val GAMES_TABLE = "subtitle_games"
 		const val PRELOAD_KEY = "preload_sub"
+		const val DEFAULT_GAME_ID = "gta6"
+		const val DEFAULT_GAME_NAME = "GTA VI"
+		const val ALL_GAMES_ID = "ALL"
 		private const val ASSET_PRELOAD_FILE = "preload_gta6_cache.tsv"
 		private const val PRELOAD_PREFS = "ps_translator_cache_meta"
 		private const val PREF_PRELOAD_COUNT = "seeded_asset_line_count_v5"
-		private const val MAX_ROWS = 60000
+		private const val PREF_ACTIVE_GAME_ID = "active_subtitle_game_id"
+		private const val MAX_ROWS = 120000
 		private const val MAX_SKELETON_BUCKET = 260
 
 		private val SPEAKER_PREFIX_REGEX = Regex("^([A-Za-z][A-Za-z0-9 .'_-]{1,22}):\\s+(.+)$")
@@ -103,10 +115,6 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 				.trim('"', '\'', '.', '!', '?', ',', ';', ':', '-', ' ')
 		}
 
-		/**
-		 * Collapses common OCR confusions (I/l/1 -> i, 0 -> o) and strips all spaces/punctuation
-		 * so minor OCR spacing or punctuation differences match in O(1) time.
-		 */
 		fun ocrSkeleton(text: String): String {
 			val sb = StringBuilder(text.length)
 			for (ch in text) {
@@ -121,10 +129,6 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 			return sb.toString()
 		}
 
-		/**
-		 * Exact full-row normalized Levenshtein similarity in [0.0, 1.0] with early row-minimum abort.
-		 * Fills every column 1..lenB on each row so uninitialized values can never cause false matches.
-		 */
 		fun exactSimilarityAtLeast(a: String, b: String, minSimilarity: Double = 0.90): Double {
 			val lenA = a.length
 			val lenB = b.length
@@ -177,22 +181,159 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 				normalized_en TEXT NOT NULL,
 				thai_text TEXT NOT NULL,
 				updated_at INTEGER NOT NULL,
+				game_id TEXT NOT NULL DEFAULT '$DEFAULT_GAME_ID',
 				PRIMARY KEY (cache_key, normalized_en)
+			)
+			""".trimIndent()
+		)
+		db.execSQL(
+			"""
+			CREATE TABLE IF NOT EXISTS $GAMES_TABLE (
+				game_id TEXT PRIMARY KEY,
+				game_name TEXT NOT NULL,
+				created_at INTEGER NOT NULL
 			)
 			""".trimIndent()
 		)
 		db.execSQL("CREATE INDEX IF NOT EXISTS idx_cache_updated_at ON $TABLE_NAME(updated_at)")
 		db.execSQL("CREATE INDEX IF NOT EXISTS idx_cache_norm_en ON $TABLE_NAME(normalized_en)")
+		db.execSQL("CREATE INDEX IF NOT EXISTS idx_cache_game_id ON $TABLE_NAME(game_id)")
+		ensureDefaultGameRow(db)
 	}
 
 	override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-		db.execSQL("DROP TABLE IF EXISTS $TABLE_NAME")
-		onCreate(db)
+		if (oldVersion < 2) {
+			try {
+				db.execSQL("ALTER TABLE $TABLE_NAME ADD COLUMN game_id TEXT NOT NULL DEFAULT '$DEFAULT_GAME_ID'")
+			} catch (_: Exception) {}
+			db.execSQL(
+				"""
+				CREATE TABLE IF NOT EXISTS $GAMES_TABLE (
+					game_id TEXT PRIMARY KEY,
+					game_name TEXT NOT NULL,
+					created_at INTEGER NOT NULL
+				)
+				""".trimIndent()
+			)
+			db.execSQL("CREATE INDEX IF NOT EXISTS idx_cache_game_id ON $TABLE_NAME(game_id)")
+			ensureDefaultGameRow(db)
+		}
+	}
+
+	private fun ensureDefaultGameRow(db: SQLiteDatabase) {
+		try {
+			val cv = ContentValues().apply {
+				put("game_id", DEFAULT_GAME_ID)
+				put("game_name", DEFAULT_GAME_NAME)
+				put("created_at", 1L)
+			}
+			db.insertWithOnConflict(GAMES_TABLE, null, cv, SQLiteDatabase.CONFLICT_IGNORE)
+		} catch (_: Exception) {}
+	}
+
+	fun getActiveGameId(): String {
+		return appContext.getSharedPreferences(PRELOAD_PREFS, Context.MODE_PRIVATE)
+			.getString(PREF_ACTIVE_GAME_ID, ALL_GAMES_ID)
+			?.ifBlank { ALL_GAMES_ID }
+			?: ALL_GAMES_ID
+	}
+
+	@Synchronized
+	fun setActiveGameId(gameId: String) {
+		val clean = gameId.trim().ifBlank { ALL_GAMES_ID }
+		appContext.getSharedPreferences(PRELOAD_PREFS, Context.MODE_PRIVATE)
+			.edit()
+			.putString(PREF_ACTIVE_GAME_ID, clean)
+			.apply()
+		if (memoryIndexLoaded) {
+			rebuildMemoryIndex()
+		}
+	}
+
+	@Synchronized
+	fun listGameCategories(): List<GameCategoryInfo> {
+		ensureInitialized()
+		val result = ArrayList<GameCategoryInfo>()
+		try {
+			val db = readableDatabase
+			ensureDefaultGameRow(writableDatabase)
+			val counts = HashMap<String, Int>()
+			db.rawQuery(
+				"SELECT game_id, COUNT(DISTINCT normalized_en) FROM $TABLE_NAME GROUP BY game_id",
+				null
+			).use { c ->
+				while (c.moveToNext()) {
+					val gid = c.getString(0)?.ifBlank { DEFAULT_GAME_ID } ?: DEFAULT_GAME_ID
+					counts[gid] = c.getInt(1)
+				}
+			}
+			db.rawQuery(
+				"SELECT game_id, game_name FROM $GAMES_TABLE ORDER BY created_at ASC",
+				null
+			).use { c ->
+				while (c.moveToNext()) {
+					val gid = c.getString(0) ?: continue
+					val gname = c.getString(1) ?: gid
+					result.add(
+						GameCategoryInfo(
+							gameId = gid,
+							gameName = gname,
+							sentenceCount = counts[gid] ?: 0,
+							isBuiltIn = gid == DEFAULT_GAME_ID
+						)
+					)
+				}
+			}
+		} catch (_: Exception) {}
+
+		if (result.none { it.gameId == DEFAULT_GAME_ID }) {
+			result.add(0, GameCategoryInfo(DEFAULT_GAME_ID, DEFAULT_GAME_NAME, count().toInt(), true))
+		}
+		return result
+	}
+
+	@Synchronized
+	fun addGameCategory(gameName: String): GameCategoryInfo {
+		ensureInitialized()
+		val cleanName = gameName.trim().ifBlank { "Custom Game" }
+		val baseSlug = cleanName.lowercase()
+			.replace(Regex("[^a-z0-9]+"), "_")
+			.trim('_')
+			.ifBlank { "game_${System.currentTimeMillis() % 100000}" }
+		val uniqueId = if (baseSlug == DEFAULT_GAME_ID || baseSlug == ALL_GAMES_ID.lowercase()) {
+			"${baseSlug}_${System.currentTimeMillis() % 10000}"
+		} else {
+			baseSlug
+		}
+		val cv = ContentValues().apply {
+			put("game_id", uniqueId)
+			put("game_name", cleanName)
+			put("created_at", System.currentTimeMillis())
+		}
+		writableDatabase.insertWithOnConflict(GAMES_TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+		return GameCategoryInfo(uniqueId, cleanName, 0, false)
+	}
+
+	@Synchronized
+	fun deleteGameCategory(gameId: String) {
+		if (gameId == DEFAULT_GAME_ID || gameId == ALL_GAMES_ID) return
+		ensureInitialized()
+		try {
+			val db = writableDatabase
+			db.delete(TABLE_NAME, "game_id = ?", arrayOf(gameId))
+			db.delete(GAMES_TABLE, "game_id = ?", arrayOf(gameId))
+			if (getActiveGameId() == gameId) {
+				setActiveGameId(ALL_GAMES_ID)
+			} else {
+				rebuildMemoryIndex()
+			}
+		} catch (_: Exception) {}
 	}
 
 	@Synchronized
 	fun ensureInitialized() {
 		if (memoryIndexLoaded) return
+		ensureDefaultGameRow(writableDatabase)
 		seedFromAssetsIfNeeded()
 		rebuildMemoryIndex()
 		memoryIndexLoaded = true
@@ -210,7 +351,6 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 						if (tabIdx > 0 && tabIdx < line.length - 1) {
 							val en = line.substring(0, tabIdx).trim()
 							val th = line.substring(tabIdx + 1).trim()
-							// Skip overly short single-word fragments (< 4 chars) from asset seed to avoid false matches
 							if (en.length >= 4 && th.any { it in '\u0E00'..'\u0E7F' }) {
 								assetLines.add(en to th)
 							}
@@ -231,10 +371,9 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 			val now = System.currentTimeMillis()
 			db.beginTransaction()
 			try {
-				// Clear older preloaded rows before re-seeding clean v3 pack
-				db.delete(TABLE_NAME, "cache_key = ?", arrayOf(PRELOAD_KEY))
+				db.delete(TABLE_NAME, "cache_key = ? AND game_id = ?", arrayOf(PRELOAD_KEY, DEFAULT_GAME_ID))
 				val stmt = db.compileStatement(
-					"INSERT OR REPLACE INTO $TABLE_NAME (cache_key, normalized_en, thai_text, updated_at) VALUES (?, ?, ?, ?)"
+					"INSERT OR REPLACE INTO $TABLE_NAME (cache_key, normalized_en, thai_text, updated_at, game_id) VALUES (?, ?, ?, ?, ?)"
 				)
 				for ((en, th) in assetLines) {
 					val norm = normalizeEnglish(en)
@@ -244,6 +383,7 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 						stmt.bindString(2, norm)
 						stmt.bindString(3, th)
 						stmt.bindLong(4, now)
+						stmt.bindString(5, DEFAULT_GAME_ID)
 						stmt.executeInsert()
 					}
 				}
@@ -252,16 +392,14 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 				db.endTransaction()
 			}
 			prefs.edit().putInt(PREF_PRELOAD_COUNT, assetLines.size).apply()
-		} catch (_: Exception) {
-			// Asset file is optional
-		}
+		} catch (_: Exception) {}
 	}
 
 	private fun countPreloadedRows(): Int {
 		return try {
 			readableDatabase.rawQuery(
-				"SELECT COUNT(*) FROM $TABLE_NAME WHERE cache_key = ?",
-				arrayOf(PRELOAD_KEY)
+				"SELECT COUNT(*) FROM $TABLE_NAME WHERE cache_key = ? AND game_id = ?",
+				arrayOf(PRELOAD_KEY, DEFAULT_GAME_ID)
 			).use { c ->
 				if (c.moveToFirst()) c.getInt(0) else 0
 			}
@@ -276,15 +414,23 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 		skeletonMemoryMap.clear()
 		for (bucket in lengthBuckets) bucket.clear()
 
+		val activeGame = getActiveGameId()
 		try {
-			// Only index dialogue subtitles (never index *_pop into subtitle memory map)
-			readableDatabase.rawQuery(
-				"SELECT normalized_en, thai_text FROM $TABLE_NAME WHERE cache_key NOT LIKE '%_pop' ORDER BY CASE WHEN cache_key = ? THEN 0 ELSE 1 END ASC, updated_at ASC",
-				arrayOf(PRELOAD_KEY)
-			).use { cursor ->
-				while (cursor.moveToNext()) {
-					val norm = cursor.getString(0) ?: continue
-					val thai = cursor.getString(1) ?: continue
+			val cursor = if (activeGame == ALL_GAMES_ID) {
+				readableDatabase.rawQuery(
+					"SELECT normalized_en, thai_text FROM $TABLE_NAME WHERE cache_key NOT LIKE '%_pop' ORDER BY CASE WHEN cache_key = ? THEN 0 ELSE 1 END ASC, updated_at ASC",
+					arrayOf(PRELOAD_KEY)
+				)
+			} else {
+				readableDatabase.rawQuery(
+					"SELECT normalized_en, thai_text FROM $TABLE_NAME WHERE game_id = ? AND cache_key NOT LIKE '%_pop' ORDER BY CASE WHEN cache_key = ? THEN 0 ELSE 1 END ASC, updated_at ASC",
+					arrayOf(activeGame, PRELOAD_KEY)
+				)
+			}
+			cursor.use { c ->
+				while (c.moveToNext()) {
+					val norm = c.getString(0) ?: continue
+					val thai = c.getString(1) ?: continue
 					indexInMemory(norm, thai)
 				}
 			}
@@ -309,8 +455,6 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 		val trimmed = englishText.trim()
 		if (trimmed.isEmpty()) return null
 
-		// CRITICAL: For Popup / Tutorial zones (*_pop), ONLY check exact popup cache in SQLite!
-		// Never match tutorial tips against dialogue subtitles (preload_sub).
 		if (cacheKey.endsWith("_pop")) {
 			val norm = normalizeEnglish(trimmed)
 			if (norm.isEmpty()) return null
@@ -326,10 +470,8 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 			}
 		}
 
-		// 1. Direct lookup on full subtitle text (exact SQLite key -> in-memory exact -> OCR skeleton -> strict fuzzy)
 		lookupSingleSubtitleSegment(cacheKey, trimmed)?.let { return it }
 
-		// 2. If subtitle has a "Speaker: Dialogue" prefix, try matching the dialogue part
 		val match = SPEAKER_PREFIX_REGEX.find(trimmed)
 		if (match != null) {
 			val speakerRaw = match.groupValues[1].trim()
@@ -354,26 +496,31 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 		val norm = normalizeEnglish(segmentText)
 		if (norm.length < 4) return null
 
-		// Step A: Exact provider cacheKey match in SQLite
+		val activeGame = getActiveGameId()
 		try {
-			readableDatabase.rawQuery(
-				"SELECT thai_text FROM $TABLE_NAME WHERE cache_key = ? AND normalized_en = ? LIMIT 1",
-				arrayOf(cacheKey, norm)
-			).use { cursor ->
-				if (cursor.moveToFirst()) return cursor.getString(0)
+			val cursor = if (activeGame == ALL_GAMES_ID) {
+				readableDatabase.rawQuery(
+					"SELECT thai_text FROM $TABLE_NAME WHERE cache_key = ? AND normalized_en = ? LIMIT 1",
+					arrayOf(cacheKey, norm)
+				)
+			} else {
+				readableDatabase.rawQuery(
+					"SELECT thai_text FROM $TABLE_NAME WHERE cache_key = ? AND normalized_en = ? AND game_id = ? LIMIT 1",
+					arrayOf(cacheKey, norm, activeGame)
+				)
+			}
+			cursor.use { c ->
+				if (c.moveToFirst()) return c.getString(0)
 			}
 		} catch (_: Exception) {}
 
-		// Step B: Universal in-memory exact normalized match (0ms)
 		exactMemoryMap[norm]?.let { return it }
 
-		// Step C: OCR-invariant skeleton exact match (handles I/l/1, O/0, punctuation & space glitches in 0ms)
 		val skel = ocrSkeleton(norm)
 		if (skel.length >= 6) {
 			skeletonMemoryMap[skel]?.let { return it }
 		}
 
-		// Step D: Strict exact-Levenshtein fuzzy match (>= 90% similarity, only for sentences >= 15 chars)
 		if (skel.length in 15..MAX_SKELETON_BUCKET) {
 			val minSim = 0.90
 			val maxDiff = ((1.0 - minSim) * skel.length).toInt().coerceAtLeast(1)
@@ -406,9 +553,9 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 		val norm = normalizeEnglish(englishText)
 		val cleanThai = thaiText.trim()
 		if (norm.length < 4 || cleanThai.isEmpty()) return
-		// Only cache genuine Thai translations (never cache raw English fallback or broken outputs)
 		if (!cleanThai.any { it in '\u0E00'..'\u0E7F' }) return
 
+		val targetGame = getActiveGameId().let { if (it == ALL_GAMES_ID) DEFAULT_GAME_ID else it }
 		try {
 			val db = writableDatabase
 			val values = ContentValues().apply {
@@ -416,13 +563,12 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 				put("normalized_en", norm)
 				put("thai_text", cleanThai)
 				put("updated_at", System.currentTimeMillis())
+				put("game_id", targetGame)
 			}
 			db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE)
 			if (!cacheKey.endsWith("_pop")) {
 				indexInMemory(norm, cleanThai)
 			}
-
-			// Periodically prune oldest rows if database exceeds cap
 			if (System.currentTimeMillis() % 50L == 0L) {
 				pruneIfNeeded(db)
 			}
@@ -430,12 +576,17 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 	}
 
 	/**
-	 * Imports translations from a user-selected .db (SQLite) or .tsv (Tab-separated English\tThai) file.
-	 * Returns the number of imported entries.
+	 * Imports translations from a user-selected .db (SQLite) or .tsv / .txt (English\tThai) file
+	 * directly into the specified game category (`targetGameId`).
 	 */
 	@Synchronized
-	fun importFromUri(context: Context, uri: Uri): Int {
+	fun importFromUri(context: Context, uri: Uri, targetGameId: String = DEFAULT_GAME_ID): Int {
 		ensureInitialized()
+		val safeGameId = targetGameId.trim().ifBlank { DEFAULT_GAME_ID }.let {
+			if (it == ALL_GAMES_ID) DEFAULT_GAME_ID else it
+		}
+		val importCacheKey = if (safeGameId == DEFAULT_GAME_ID) PRELOAD_KEY else "game_${safeGameId}_sub"
+
 		val tmpFile = File(context.cacheDir, "import_translation_cache.tmp")
 		try {
 			context.contentResolver.openInputStream(uri)?.use { input ->
@@ -468,10 +619,10 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 					lines.forEach { rawLine ->
 						val line = rawLine.trim()
 						if (line.isEmpty() || line.startsWith("#")) return@forEach
-						val tabIdx = line.indexOf('\t')
-						if (tabIdx > 0 && tabIdx < line.length - 1) {
-							val en = line.substring(0, tabIdx).trim()
-							val th = line.substring(tabIdx + 1).trim()
+						val sepIdx = line.indexOf('\t').takeIf { it > 0 } ?: line.indexOf('|')
+						if (sepIdx > 0 && sepIdx < line.length - 1) {
+							val en = line.substring(0, sepIdx).trim()
+							val th = line.substring(sepIdx + 1).trim()
 							if (en.length >= 4 && th.any { it in '\u0E00'..'\u0E7F' }) {
 								pairs.add(en to th)
 							}
@@ -488,16 +639,17 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 			db.beginTransaction()
 			try {
 				val stmt = db.compileStatement(
-					"INSERT OR REPLACE INTO $TABLE_NAME (cache_key, normalized_en, thai_text, updated_at) VALUES (?, ?, ?, ?)"
+					"INSERT OR REPLACE INTO $TABLE_NAME (cache_key, normalized_en, thai_text, updated_at, game_id) VALUES (?, ?, ?, ?, ?)"
 				)
 				for ((en, th) in pairs) {
 					val norm = normalizeEnglish(en)
 					if (norm.length >= 4) {
 						stmt.clearBindings()
-						stmt.bindString(1, PRELOAD_KEY)
+						stmt.bindString(1, importCacheKey)
 						stmt.bindString(2, norm)
 						stmt.bindString(3, th)
 						stmt.bindLong(4, now)
+						stmt.bindString(5, safeGameId)
 						stmt.executeInsert()
 						imported++
 					}
@@ -524,7 +676,7 @@ class TranslationCacheDb(private val appContext: Context) : SQLiteOpenHelper(
 			if (total > MAX_ROWS) {
 				val toDelete = total - (MAX_ROWS - 2000)
 				db.execSQL(
-					"DELETE FROM $TABLE_NAME WHERE rowid IN (SELECT rowid FROM $TABLE_NAME WHERE cache_key != ? ORDER BY updated_at ASC LIMIT ?)",
+					"DELETE FROM $TABLE_NAME WHERE rowid IN (SELECT rowid FROM $TABLE_NAME WHERE cache_key != ? AND cache_key NOT LIKE 'game_%_sub' ORDER BY updated_at ASC LIMIT ?)",
 					arrayOf(PRELOAD_KEY, toDelete)
 				)
 			}

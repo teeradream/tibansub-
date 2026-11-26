@@ -14,12 +14,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -106,7 +114,14 @@ fun XboxConnectScreen(
                 fontSize = 23.sp,
                 color = Color.White
             )
-            LiquidGlassSelectablePill(label = "← กลับ", selected = false, onClick = onBack)
+            LiquidGlassSelectablePill(
+                label = "กลับ",
+                selected = false,
+                leadingIcon = {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                },
+                onClick = onBack
+            )
         }
 
         LiquidGlassCard(
@@ -119,13 +134,17 @@ fun XboxConnectScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(Color(0x3328FFA5))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0x55107C10), Color(0x5528FFA5))
+                            )
+                        )
                         .border(1.3.dp, TibanColors.AccentMint, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✕", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    XboxLogoIcon(modifier = Modifier.size(30.dp), tint = Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -138,7 +157,7 @@ fun XboxConnectScreen(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "ใช้ซับหลัก, กล่องข้อความซ้าย/ขวา, พากย์ไทย และปุ่มสามขีด (☰) ร่วมกับฝั่ง PS5 ได้ครบ 100%",
+                    text = "ใช้ซับหลัก กล่องข้อความซ้าย/ขวา พากย์ไทย และปุ่มสามขีด (☰) ร่วมกับฝั่ง PS5 ได้ครบ 100%",
                     fontFamily = TibanPromptFontFamily,
                     fontSize = 12.5.sp,
                     color = TibanColors.TextSecondary,
@@ -156,7 +175,7 @@ fun XboxConnectScreen(
                         text = statusText!!,
                         fontFamily = TibanPromptFontFamily,
                         fontSize = 13.sp,
-                        color = if (isError) Color(0xFFFF9AA2) else TibanColors.AccentMint,
+                        color = if (isError) TibanColors.ErrorSoft else TibanColors.AccentMint,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -164,15 +183,21 @@ fun XboxConnectScreen(
 
                 if (tokens == null) {
                     LiquidGlassButton(
-                        text = "🔑 ล็อกอินบัญชี Microsoft (Xbox Live)",
+                        text = "ล็อกอินบัญชี Microsoft (Xbox Live)",
+                        leadingContent = {
+                            Icon(Icons.Rounded.Key, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(17.dp))
+                        },
                         onClick = { showMicrosoftOAuth = true },
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         LiquidGlassButton(
-                            text = "🔄 รีเฟรชรายชื่อเครื่อง",
+                            text = "รีเฟรชรายชื่อเครื่อง",
                             primaryGlow = false,
+                            leadingContent = {
+                                Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            },
                             onClick = { loadConsolesFromTokens(tokens!!) },
                             modifier = Modifier.weight(1f)
                         )
@@ -222,14 +247,14 @@ fun XboxConnectScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "${xbox.consoleType} • สถานะ: ${xbox.powerState}",
+                            text = "${xbox.consoleType} | สถานะ: ${xbox.powerState}",
                             fontFamily = TibanPromptFontFamily,
                             fontSize = 12.5.sp,
                             color = TibanColors.AccentMint
                         )
                     }
                     LiquidGlassButton(
-                        text = "เริ่มแปล →",
+                        text = "เริ่มแปล",
                         onClick = {
                             val t = tokens ?: return@LiquidGlassButton
                             onLaunchXboxStream(
@@ -247,8 +272,11 @@ fun XboxConnectScreen(
         }
 
         LiquidGlassButton(
-            text = "📖 ดูวิธีเปิด Remote Features บนเครื่อง Xbox",
+            text = "ดูวิธีเปิด Remote Features บนเครื่อง Xbox",
             primaryGlow = false,
+            leadingContent = {
+                Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+            },
             onClick = onOpenGuide,
             modifier = Modifier.fillMaxWidth()
         )
@@ -292,9 +320,9 @@ private fun MicrosoftXboxOAuthDialog(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(12.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFF101928))
+                .background(Color(0xFF130A2B))
                 .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
         ) {
             Row(
@@ -311,7 +339,14 @@ private fun MicrosoftXboxOAuthDialog(
                     fontSize = 15.sp,
                     color = Color.White
                 )
-                LiquidGlassSelectablePill(label = "ปิด ✕", selected = false, onClick = onDismiss)
+                LiquidGlassSelectablePill(
+                    label = "ปิด",
+                    selected = false,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    },
+                    onClick = onDismiss
+                )
             }
 
             AndroidView(
