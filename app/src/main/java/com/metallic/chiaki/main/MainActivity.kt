@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
                 val activeGameId by activeGameIdState
                 val updateState by updateUiState
 
-                var currentTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings, 2=TvInstaller, 3=Guide
+                var currentTab by remember { mutableStateOf(0) } // 0=Home, 1=TvInstaller, 2=Guide, 3=Settings
                 var psPairingHostIp by remember { mutableStateOf<String?>(null) }
                 var psPairingManualId by remember { mutableStateOf<Long?>(null) }
                 var showPsPairingOverlay by remember { mutableStateOf(false) }
@@ -153,7 +153,7 @@ class MainActivity : AppCompatActivity() {
                                     onPairedSuccess = { showPsPairingOverlay = false },
                                     onOpenGuide = {
                                         showPsPairingOverlay = false
-                                        currentTab = 3
+                                        currentTab = 2
                                     },
                                     onClose = { showPsPairingOverlay = false }
                                 )
@@ -163,7 +163,7 @@ class MainActivity : AppCompatActivity() {
                                     onLaunchXboxStream = { xboxCfg -> launchXboxStream(xboxCfg) },
                                     onOpenGuide = {
                                         showXboxOverlay = false
-                                        currentTab = 3
+                                        currentTab = 2
                                     },
                                     onBack = { showXboxOverlay = false }
                                 )
@@ -198,7 +198,17 @@ class MainActivity : AppCompatActivity() {
                                         onOpenXboxScreen = { showXboxOverlay = true },
                                         onNavigateTab = { currentTab = it }
                                     )
-                                    1 -> PreSettingsScreen(
+                                    1 -> TvInstallerScreen()
+                                    2 -> HowToGuideScreen(
+                                        onJumpToPsPairing = {
+                                            psPairingHostIp = null
+                                            psPairingManualId = null
+                                            showPsPairingOverlay = true
+                                        },
+                                        onJumpToXboxConnect = { showXboxOverlay = true },
+                                        onJumpToTvInstaller = { currentTab = 1 }
+                                    )
+                                    else -> PreSettingsScreen(
                                         snapshot = preSettings,
                                         cacheSentenceCount = cacheCount,
                                         gameCategories = gameCategories,
@@ -218,16 +228,6 @@ class MainActivity : AppCompatActivity() {
                                         onDownloadUpdate = { rel -> downloadAndInstallUpdate(rel) },
                                         onExportBackup = { exportBackupFile() },
                                         onImportBackup = { importBackupFile() }
-                                    )
-                                    2 -> TvInstallerScreen()
-                                    else -> HowToGuideScreen(
-                                        onJumpToPsPairing = {
-                                            psPairingHostIp = null
-                                            psPairingManualId = null
-                                            showPsPairingOverlay = true
-                                        },
-                                        onJumpToXboxConnect = { showXboxOverlay = true },
-                                        onJumpToTvInstaller = { currentTab = 2 }
                                     )
                                 }
 
@@ -550,18 +550,18 @@ private fun LiquidGlassBottomDock(
 ) {
     val items = listOf(
         DockTabItem(Icons.Rounded.Home, "หน้าหลัก"),
-        DockTabItem(Icons.Rounded.Settings, "ตั้งค่า"),
         DockTabItem(Icons.Rounded.Tv, "ติดตั้งทีวี"),
-        DockTabItem(Icons.Rounded.MenuBook, "วิธีใช้งาน")
+        DockTabItem(Icons.Rounded.MenuBook, "วิธีใช้งาน"),
+        DockTabItem(Icons.Rounded.Settings, "ตั้งค่า")
     )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xD4130A2B))
-            .border(1.2.dp, Color.White.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xD9130A2B))
+            .border(1.1.dp, Color.White.copy(alpha = 0.42f), RoundedCornerShape(22.dp))
+            .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -571,23 +571,24 @@ private fun LiquidGlassBottomDock(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(15.dp))
                     .background(if (isSelected) Color.White.copy(alpha = 0.92f) else Color.Transparent)
                     .clickable { onSelectTab(index) }
-                    .padding(vertical = 7.dp, horizontal = 4.dp)
+                    .padding(vertical = 5.dp, horizontal = 3.dp)
             ) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
                     tint = if (isSelected) Color(0xFF130A2B) else Color.White,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = item.label,
                     fontFamily = TibanPromptFontFamily,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 11.5.sp,
+                    fontSize = 11.sp,
+                    maxLines = 1,
                     color = if (isSelected) Color(0xFF130A2B) else Color.White
                 )
             }

@@ -70,15 +70,15 @@ fun TibanHomeScreen(
             painter = painterResource(id = R.drawable.tibansub_logo_badge),
             contentDescription = "TIBANSUB",
             modifier = Modifier
-                .padding(top = 4.dp)
-                .size(92.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .padding(top = 2.dp)
+                .size(78.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .border(
-                    width = 1.4.dp,
+                    width = 1.3.dp,
                     brush = Brush.linearGradient(
                         listOf(TibanColors.AccentCyan.copy(alpha = 0.7f), TibanColors.AccentPink.copy(alpha = 0.7f))
                     ),
-                    shape = RoundedCornerShape(24.dp)
+                    shape = RoundedCornerShape(20.dp)
                 )
         )
 
@@ -209,19 +209,19 @@ fun TibanHomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 LiquidGlassSelectablePill(
-                    label = "จับคู่เครื่องใหม่ (PIN)",
+                    label = "จับคู่ใหม่ (PIN)",
                     selected = false,
                     leadingIcon = {
-                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                     },
                     onClick = { onOpenPsPairing(primaryPsHost?.host) },
                     modifier = Modifier.weight(1f)
                 )
                 LiquidGlassSelectablePill(
-                    label = "เพิ่ม IP เครื่องเอง",
+                    label = "เพิ่ม IP เอง",
                     selected = false,
                     leadingIcon = {
-                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                     },
                     onClick = { showAddIpSheet = true },
                     modifier = Modifier.weight(1f)
@@ -305,7 +305,7 @@ fun TibanHomeScreen(
                     leadingIcon = {
                         Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                     },
-                    onClick = { onNavigateTab(1) }
+                    onClick = { onNavigateTab(3) }
                 )
             }
 
@@ -332,7 +332,7 @@ fun TibanHomeScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
             LiquidGlassButton(
-                text = if (primaryPsHost?.isRegistered == true) "เริ่มแปลภาษาทันที (CONNECT & START)"
+                text = if (primaryPsHost?.isRegistered == true) "เริ่มเชื่อมต่อ & แปลภาษา"
                 else "ตั้งค่าจับคู่เครื่องเพื่อเริ่มใช้งาน",
                 onClick = {
                     if (primaryPsHost != null) {
@@ -353,8 +353,8 @@ fun TibanHomeScreen(
                 .clip(CircleShape)
                 .background(Color(0x88130A2B))
                 .border(1.dp, Color.White.copy(alpha = 0.40f), CircleShape)
-                .clickable { onNavigateTab(1) }
-                .padding(horizontal = 16.dp, vertical = 7.dp)
+                .clickable { onNavigateTab(3) }
+                .padding(horizontal = 14.dp, vertical = 6.dp)
         ) {
             Icon(
                 imageVector = Icons.Rounded.Storage,

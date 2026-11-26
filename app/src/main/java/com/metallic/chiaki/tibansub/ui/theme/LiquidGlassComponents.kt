@@ -317,6 +317,7 @@ fun LiquidGlassButton(
     modifier: Modifier = Modifier,
     primaryGlow: Boolean = true,
     enabled: Boolean = true,
+    compact: Boolean = false,
     leadingContent: (@Composable () -> Unit)? = null
 ) {
     val view = LocalView.current
@@ -356,6 +357,7 @@ fun LiquidGlassButton(
 
     Row(
         modifier = modifier
+            .heightIn(min = if (compact) 38.dp else 44.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -363,7 +365,7 @@ fun LiquidGlassButton(
             }
             .clip(CircleShape)
             .background(bgBrush)
-            .border(1.2.dp, borderBrush, CircleShape)
+            .border(1.1.dp, borderBrush, CircleShape)
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
@@ -372,19 +374,24 @@ fun LiquidGlassButton(
                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onClick()
             }
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(
+                horizontal = if (compact) 12.dp else 16.dp,
+                vertical = if (compact) 7.dp else 10.dp
+            ),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (leadingContent != null) {
             leadingContent()
-            Spacer(modifier = Modifier.width(7.dp))
+            Spacer(modifier = Modifier.width(6.dp))
         }
         Text(
             text = text,
             fontFamily = TibanPromptFontFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.5.sp,
+            fontSize = if (compact) 12.5.sp else 13.5.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             color = if (primaryGlow && enabled) Color(0xFF130A2B) else Color.White,
             textAlign = TextAlign.Center
         )
@@ -415,6 +422,7 @@ fun LiquidGlassSelectablePill(
 
     Row(
         modifier = modifier
+            .heightIn(min = 32.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -425,7 +433,7 @@ fun LiquidGlassSelectablePill(
                 else Color(0x66130A2B)
             )
             .border(
-                width = if (selected) 1.5.dp else 1.dp,
+                width = if (selected) 1.3.dp else 1.dp,
                 color = if (selected) accentColor else Color.White.copy(alpha = 0.30f),
                 shape = CircleShape
             )
@@ -436,19 +444,21 @@ fun LiquidGlassSelectablePill(
                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 onClick()
             }
-            .padding(horizontal = 13.dp, vertical = 8.dp),
+            .padding(horizontal = 11.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         if (leadingIcon != null) {
             leadingIcon()
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(5.dp))
         }
         Text(
             text = label,
             fontFamily = TibanPromptFontFamily,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 13.sp,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             color = if (selected) Color(0xFF130A2B) else Color.White
         )
     }

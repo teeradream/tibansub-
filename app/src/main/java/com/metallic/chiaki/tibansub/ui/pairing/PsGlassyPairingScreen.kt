@@ -231,28 +231,30 @@ fun PsGlassyPairingScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         LiquidGlassButton(
-                            text = if (isFetchingPsn) "กำลังดึงรหัส..." else "ล็อกอิน PSN ดึงอัตโนมัติ",
+                            text = if (isFetchingPsn) "กำลังดึง..." else "ล็อกอิน PSN",
                             primaryGlow = !step2Done,
+                            compact = true,
                             enabled = !isFetchingPsn,
                             leadingContent = {
                                 Icon(
                                     Icons.Rounded.Key,
                                     contentDescription = null,
                                     tint = if (!step2Done) Color(0xFF130A2B) else Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             },
                             onClick = { showSonyOAuthDialog = true },
-                            modifier = Modifier.weight(1.15f)
+                            modifier = Modifier.weight(1f)
                         )
                         LiquidGlassButton(
-                            text = "ค้นจากชื่อ PSN",
+                            text = "ค้นชื่อ PSN",
                             primaryGlow = false,
+                            compact = true,
                             leadingContent = {
-                                Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                             },
                             onClick = { showInAppLookupWebDialog = true },
-                            modifier = Modifier.weight(0.85f)
+                            modifier = Modifier.weight(1f)
                         )
                     }
 
@@ -441,10 +443,11 @@ fun PsGlassyPairingScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     LiquidGlassButton(
-                        text = "ดูวิธีทำทีละขั้น",
+                        text = "ดูวิธีทำ",
                         primaryGlow = false,
+                        compact = true,
                         leadingContent = {
-                            Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                         },
                         onClick = onOpenGuide,
                         modifier = Modifier.weight(1f)
@@ -452,6 +455,7 @@ fun PsGlassyPairingScreen(
                     LiquidGlassButton(
                         text = "กลับหน้าหลัก",
                         primaryGlow = false,
+                        compact = true,
                         onClick = onClose,
                         modifier = Modifier.weight(1f)
                     )

@@ -325,10 +325,11 @@ fun PreSettingsScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
             LiquidGlassButton(
-                text = "ซิงค์คลังซับ GTA VI ล่าสุดจากคลาวด์",
+                text = "ซิงค์คลังซับจากคลาวด์",
                 primaryGlow = false,
+                compact = true,
                 leadingContent = {
-                    Icon(Icons.Rounded.CloudSync, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Rounded.CloudSync, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                 },
                 onClick = onSyncCloudDb,
                 modifier = Modifier.fillMaxWidth()
@@ -401,19 +402,21 @@ fun PreSettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 LiquidGlassButton(
-                    text = "ส่งออกไฟล์สำรอง",
+                    text = "ส่งออกสำรอง",
                     primaryGlow = false,
+                    compact = true,
                     leadingContent = {
-                        Icon(Icons.Rounded.Backup, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Backup, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                     },
                     onClick = onExportBackup,
                     modifier = Modifier.weight(1f)
                 )
                 LiquidGlassButton(
-                    text = "กู้คืนไฟล์สำรอง",
+                    text = "กู้คืนสำรอง",
                     primaryGlow = false,
+                    compact = true,
                     leadingContent = {
-                        Icon(Icons.Rounded.Restore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Restore, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                     },
                     onClick = onImportBackup,
                     modifier = Modifier.weight(1f)
@@ -494,22 +497,23 @@ fun PreSettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 LiquidGlassButton(
-                    text = if (updateState.isChecking) "กำลังตรวจสอบ..." else "เช็กอัปเดตเวอร์ชันใหม่",
+                    text = if (updateState.isChecking) "กำลังเช็ก..." else "เช็กอัปเดต",
                     primaryGlow = updateState.availableRelease == null,
+                    compact = true,
                     enabled = !updateState.isChecking && !updateState.isDownloading,
                     leadingContent = {
                         if (updateState.isChecking) {
                             CircularProgressIndicator(
                                 color = Color(0xFF130A2B),
                                 strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         } else {
                             Icon(
                                 Icons.Rounded.SystemUpdate,
                                 contentDescription = null,
                                 tint = if (updateState.availableRelease == null) Color(0xFF130A2B) else Color.White,
-                                modifier = Modifier.size(17.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     },
@@ -522,9 +526,10 @@ fun PreSettingsScreen(
                     LiquidGlassButton(
                         text = "ติดตั้ง ${rel.tagName}",
                         primaryGlow = true,
+                        compact = true,
                         enabled = !updateState.isDownloading,
                         leadingContent = {
-                            Icon(Icons.Rounded.Download, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(17.dp))
+                            Icon(Icons.Rounded.Download, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(16.dp))
                         },
                         onClick = { onDownloadUpdate(rel) },
                         modifier = Modifier.weight(1f)

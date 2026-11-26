@@ -168,9 +168,10 @@ fun TvInstallerScreen() {
                 LiquidGlassButton(
                     text = if (isScanning) "กำลังสแกน..." else "สแกนหาทีวี",
                     primaryGlow = false,
+                    compact = true,
                     enabled = !isScanning,
                     leadingContent = {
-                        Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                     },
                     onClick = { triggerScan() }
                 )
@@ -315,27 +316,29 @@ fun TvInstallerScreen() {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         LiquidGlassButton(
-                            text = if (samsungSession != null) "สลับบัญชี Samsung" else "ล็อกอิน Samsung Account",
+                            text = if (samsungSession != null) "สลับบัญชี" else "ล็อกอิน Samsung",
                             primaryGlow = samsungSession == null && !hasCert,
+                            compact = true,
                             leadingContent = {
                                 Icon(
                                     Icons.Rounded.Key,
                                     contentDescription = null,
                                     tint = if (samsungSession == null && !hasCert) Color(0xFF130A2B) else Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                             },
                             onClick = { showSamsungAccountWeb = true },
-                            modifier = Modifier.weight(1.25f)
+                            modifier = Modifier.weight(1.15f)
                         )
                         LiquidGlassButton(
                             text = "นำเข้า .p12",
                             primaryGlow = false,
+                            compact = true,
                             leadingContent = {
-                                Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                             },
                             onClick = { p12Picker.launch("*/*") },
-                            modifier = Modifier.weight(0.75f)
+                            modifier = Modifier.weight(0.85f)
                         )
                     }
 
@@ -380,9 +383,9 @@ fun TvInstallerScreen() {
                     }
                 } else {
                     LiquidGlassButton(
-                        text = "ติดตั้งลงทีวี Samsung อัตโนมัติ (1-Click)",
+                        text = "ติดตั้งลงทีวี Samsung",
                         leadingContent = {
-                            Icon(Icons.Rounded.Tv, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Tv, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(17.dp))
                         },
                         onClick = {
                             isInstalling = true
@@ -488,9 +491,9 @@ fun TvInstallerScreen() {
                     }
                 } else {
                     LiquidGlassButton(
-                        text = "ยิงติดตั้ง APK เข้า Android TV ทันที",
+                        text = "ติดตั้งลง Android TV",
                         leadingContent = {
-                            Icon(Icons.Rounded.RocketLaunch, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.RocketLaunch, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(17.dp))
                         },
                         onClick = {
                             isInstalling = true

@@ -183,9 +183,9 @@ fun XboxConnectScreen(
 
                 if (tokens == null) {
                     LiquidGlassButton(
-                        text = "ล็อกอินบัญชี Microsoft (Xbox Live)",
+                        text = "ล็อกอินบัญชี Microsoft",
                         leadingContent = {
-                            Icon(Icons.Rounded.Key, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(17.dp))
+                            Icon(Icons.Rounded.Key, contentDescription = null, tint = Color(0xFF130A2B), modifier = Modifier.size(16.dp))
                         },
                         onClick = { showMicrosoftOAuth = true },
                         modifier = Modifier.fillMaxWidth()
@@ -193,10 +193,11 @@ fun XboxConnectScreen(
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         LiquidGlassButton(
-                            text = "รีเฟรชรายชื่อเครื่อง",
+                            text = "รีเฟรชเครื่อง",
                             primaryGlow = false,
+                            compact = true,
                             leadingContent = {
-                                Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
                             },
                             onClick = { loadConsolesFromTokens(tokens!!) },
                             modifier = Modifier.weight(1f)
@@ -204,6 +205,7 @@ fun XboxConnectScreen(
                         LiquidGlassButton(
                             text = "สลับบัญชี",
                             primaryGlow = false,
+                            compact = true,
                             onClick = {
                                 authManager.signOut()
                                 tokens = null
@@ -255,6 +257,7 @@ fun XboxConnectScreen(
                     }
                     LiquidGlassButton(
                         text = "เริ่มแปล",
+                        compact = true,
                         onClick = {
                             val t = tokens ?: return@LiquidGlassButton
                             onLaunchXboxStream(
@@ -272,10 +275,11 @@ fun XboxConnectScreen(
         }
 
         LiquidGlassButton(
-            text = "ดูวิธีเปิด Remote Features บนเครื่อง Xbox",
+            text = "ดูวิธีเปิด Remote Features บน Xbox",
             primaryGlow = false,
+            compact = true,
             leadingContent = {
-                Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
             },
             onClick = onOpenGuide,
             modifier = Modifier.fillMaxWidth()

@@ -853,32 +853,32 @@
     <LinearLayout
         android:id="@+id/btnStreamBack"
         android:layout_width="wrap_content"
-        android:layout_height="40dp"
+        android:layout_height="34dp"
         android:layout_gravity="top|start"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="16dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginStart="14dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/bg_stream_back_pill"
-        android:paddingStart="10dp"
-        android:paddingEnd="14dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="12dp"
         android:elevation="10dp"
         android:clickable="true"
         android:focusable="true">
 
         <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
             android:src="@drawable/ic_arrow_back_white"
             android:contentDescription="ย้อนกลับ"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="3dp"
             android:text="ย้อนกลับ"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold"
             android:fontFamily="@font/gta_prompt_semibold"/>
     </LinearLayout>

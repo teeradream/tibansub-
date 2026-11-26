@@ -44,17 +44,14 @@ import javax.net.ssl.X509TrustManager
  * Authentic 1-Click Samsung Smart TV (.wgt) SDB Installer + Official Samsung VD Certificate Auto-Issuer.
  *
  * Verified against Tizen Studio Samsung Certificate Extension & TizenBrewInstaller:
- * 1. Samsung Account OAuth2 sign-in via official serviceID=v285zxnl3h with local callback http://localhost:4794/signin/callback
- *    -> captures real `access_token`, `userId`, and `inputEmailID`.
- * 2. Connects to Samsung TV Developer Mode (Port 26101) and executes `shell:0 getduid` to obtain exact TV DUID.
- * 3. Generates RSA-2048 Author CSR & Distributor CSR (with SubjectAltName URN:tizen:packageid= and URN:tizen:deviceid=<DUID>)
- *    in pure Kotlin ASN.1 DER (no external BouncyCastle jar), submits them to:
- *      - POST https://svdca.samsungqbe.com/apis/v3/authors
- *      - POST https://svdca.samsungqbe.com/apis/v3/distributors
- *    and pairs the issued leaf certs with official bundled Samsung CA certificates (`vd_tizen_dev_author_ca.cer`, `vd_tizen_dev_public2.crt`).
- * 4. Signs embedded `TIBANSUB-Samsung-TV.wgt` with exact W3C XML-DSig RSA-SHA512 + Exc-C14N matching Samsung Tizen TV verifier.
- * 5. Pushes signed `.wgt` via SDB `sync:` (1420-byte chunks) to `/home/owner/share/tmp/sdk_tools/tibansub.wgt`.
- * 6. Installs on TV via `shell:0 vd_appinstall TibanTV001 /home/owner/share/tmp/sdk_tools/tibansub.wgt`.
+ * 1. Samsung Account OAuth2 sign-in via serviceID=v285zxnl3h + local callback http://localhost:4794/signin/callback.
+ * 2. Connects to Samsung TV Port 26101 (SDB) -> `shell:0 getduid` -> exact TV DUID.
+ * 3. Generates RSA-2048 Author CSR & Distributor CSR (with SubjectAltName URN:tizen:packageid= and URN:tizen:deviceid=<DUID>),
+ *    submits to `svdca.samsungqbe.com/apis/v3/authors` and `/distributors`, pairs with official bundled Samsung CA certs.
+ * 4. Signs embedded `TIBANSUB-Samsung-TV.wgt` with exact W3C XML-DSig RSA-SHA512 + Exc-C14N.
+ * 5. Pushes `device-profile.xml` (if available) and `tibansub.wgt` via SDB `sync:` (properly waiting for `OKAY`/`FAIL` after `DONE`).
+ * 6. Opens a clean SDB connection and runs `shell:0 vd_appinstall TibanTV001 /home/owner/share/tmp/sdk_tools/tibansub.wgt`
+ *    filtering packets strictly by `localId` and waiting up to 60s for real install confirmation (`spend time` / `val[ok]`).
  */
 object TizenSdbWgtInstaller {
 
@@ -68,7 +65,10 @@ object TizenSdbWgtInstaller {
             "&redirect_uri=$SAMSUNG_OAUTH_CALLBACK_URL"
 
     private const val TIZEN_PACKAGE_ID = "TibanTV001"
-    private const val REMOTE_WGT_PATH = "/home/owner/share/tmp/sdk_tools/tibansub.wgt"
+    private const val TIZEN_APP_ID = "TibanTV001.TIBANSUB"
+    private const val REMOTE_SDK_DIR = "/home/owner/share/tmp/sdk_tools"
+    private const val REMOTE_WGT_PATH = "$REMOTE_SDK_DIR/tibansub.wgt"
+    private const val REMOTE_DEVICE_PROFILE_PATH = "$REMOTE_SDK_DIR/device-profile.xml"
 
     private const val SDB_PORT = 26101
     private const val CMD_CNXN = 0x4e584e43
@@ -121,15 +121,6 @@ object TizenSdbWgtInstaller {
         return SamsungAccountSession(token, uid, email.ifBlank { "Samsung Developer" })
     }
 
-    fun clearSamsungSession(context: Context) {
-        context.getSharedPreferences(PREFS_CERT, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_ACCESS_TOKEN)
-            .remove(KEY_USER_ID)
-            .remove(KEY_EMAIL)
-            .apply()
-    }
-
     fun hasCustomCertificate(context: Context): Boolean =
         File(context.filesDir, CERT_FILE_AUTHOR_P12).exists() ||
             (File(context.filesDir, ISSUED_AUTHOR_CERT).exists() && File(context.filesDir, ISSUED_DIST_CERT).exists())
@@ -138,10 +129,6 @@ object TizenSdbWgtInstaller {
         context.getSharedPreferences(PREFS_CERT, Context.MODE_PRIVATE)
             .getString(KEY_ISSUED_DUID, null)?.takeIf { it.isNotBlank() }
 
-    /**
-     * Local loopback HTTP server listening on 127.0.0.1:4794/signin/callback to capture
-     * Samsung Account OAuth2 POST payload (`code={"access_token":"...","userId":"...","inputEmailID":"..."}`).
-     */
     class SamsungOAuthCallbackServer(
         private val onSessionCaptured: (SamsungAccountSession) -> Unit,
         private val onError: (String) -> Unit
@@ -179,7 +166,6 @@ object TizenSdbWgtInstaller {
                 socket.soTimeout = 6000
                 val ins = socket.getInputStream()
                 val headerBuf = ByteArrayOutputStream()
-                var prev = 0
                 var state = 0
                 while (headerBuf.size() < 32768) {
                     val b = ins.read()
@@ -193,7 +179,6 @@ object TizenSdbWgtInstaller {
                         else -> 0
                     }
                     if (state == 4) break
-                    prev = b
                 }
                 val headerText = headerBuf.toString("UTF-8")
                 val firstLine = headerText.lineSequence().firstOrNull().orEmpty()
@@ -212,7 +197,6 @@ object TizenSdbWgtInstaller {
                 }
                 val bodyStr = String(bodyBytes, 0, readTotal, Charsets.UTF_8)
 
-                // Parse either POST body (`code=...`) or GET query string
                 val queryPart = firstLine.split(" ").getOrNull(1)?.substringAfter("?", "").orEmpty()
                 val combinedParams = listOf(bodyStr, queryPart).filter { it.isNotBlank() }.joinToString("&")
                 val session = parseSamsungCallbackPayload(combinedParams)
@@ -269,7 +253,6 @@ object TizenSdbWgtInstaller {
             }
         }
 
-        // Standard Tizen Studio callback sends `code={"access_token":"...","userId":"...","inputEmailID":"..."}`
         val codeParam = params["code"]?.trim()
         if (!codeParam.isNullOrEmpty() && codeParam.startsWith("{")) {
             try {
@@ -283,7 +266,6 @@ object TizenSdbWgtInstaller {
             } catch (_: Exception) {}
         }
 
-        // Direct query fallback
         val directToken = params["access_token"]?.trim().orEmpty()
         val directUid = (params["userId"] ?: params["user_id"])?.trim().orEmpty()
         val directEmail = (params["inputEmailID"] ?: params["email"])?.trim().orEmpty()
@@ -324,13 +306,8 @@ object TizenSdbWgtInstaller {
     }
 
     /**
-     * Full 1-Click Pipeline for real retail Samsung Smart TVs (Tizen 4.0 - 9.0):
-     * 1. Connect to Samsung TV Port 26101 (SDB)
-     * 2. Query exact TV DUID via `shell:0 getduid`
-     * 3. Issue official Samsung Author & Distributor certs for that DUID via svdca.samsungqbe.com (or use cached/imported certs)
-     * 4. Sign embedded `TIBANSUB-Samsung-TV.wgt` using exact W3C XML-DSig RSA-SHA512
-     * 5. Push signed `.wgt` via SDB `sync:` (1420-byte chunks) to `/home/owner/share/tmp/sdk_tools/tibansub.wgt`
-     * 6. Execute `shell:0 vd_appinstall TibanTV001 /home/owner/share/tmp/sdk_tools/tibansub.wgt`
+     * Full 1-Click Pipeline for retail Samsung Smart TVs (Tizen 4.0 - 9.0):
+     * Uses isolated clean SDB sessions per phase so leftover `sync:` packets NEVER abort `vd_appinstall`.
      */
     suspend fun installEmbeddedWgtToSamsungTv(
         context: Context,
@@ -338,69 +315,121 @@ object TizenSdbWgtInstaller {
         fallbackDuid: String? = null,
         onProgress: (String) -> Unit
     ): Result<String> = withContext(Dispatchers.IO) {
+        val signedWgtFile = File(context.cacheDir, "tibansub_signed_tv.wgt")
         try {
             val cleanIp = tvIp.trim()
             if (cleanIp.isBlank()) {
                 return@withContext Result.failure(IllegalArgumentException("กรุณาระบุเลข IP ของทีวี Samsung"))
             }
 
-            onProgress("1/5 กำลังเชื่อมต่อ Developer Mode พอร์ต 26101 ที่ $cleanIp...")
-            SdbSession(cleanIp).use { sdb ->
+            // Phase 1: Query real DUID via clean SDB connection
+            onProgress("1/5 กำลังเชื่อมต่อทีวี Samsung พอร์ต 26101 และอ่าน DUID...")
+            val resolvedDuid = SdbSession(cleanIp, timeoutMs = 15000).use { sdb ->
                 sdb.connectHandshake()
-
-                onProgress("2/5 กำลังอ่านรหัสเครื่อง DUID จากทีวี Samsung...")
                 val duidOut = sdb.execShell("0 getduid").trim()
-                val resolvedDuid = duidOut.lineSequence()
+                duidOut.lineSequence()
                     .map { it.trim() }
                     .firstOrNull { it.length >= 10 && !it.contains("not found", true) && !it.contains("error", true) }
                     ?: fallbackDuid?.takeIf { it.isNotBlank() }
-                    ?: return@withContext Result.failure(
-                        IllegalStateException("อ่านรหัส DUID จากทีวีไม่ได้ (ตอบกลับ: '$duidOut') กรุณาตรวจว่าเปิด Developer Mode และใส่ IP มือถือตรงกันแล้วรีสตาร์ททีวี")
+                    ?: throw IllegalStateException(
+                        "อ่านรหัส DUID จากทีวีไม่ได้ (ทีวีตอบกลับ: '$duidOut') กรุณาตรวจว่าเปิด Developer Mode ใส่ IP มือถือตรงกัน และรีสตาร์ททีวีแล้ว"
                     )
+            }
 
-                onProgress("3/5 ได้รหัส DUID ($resolvedDuid) — กำลังเตรียมใบรับรองและประทับลายเซ็น .wgt...")
-                val signingBundle = resolveSigningBundle(context, resolvedDuid, onProgress)
-                    ?: return@withContext Result.failure(
-                        IllegalStateException("ยังไม่มีใบรับรอง Samsung สำหรับทีวีเครื่องนี้ กรุณากดปุ่ม 'ล็อกอิน Samsung Account' ด้านบนก่อน แล้วกดติดตั้งอีกครั้ง")
-                    )
-
-                val signedWgtFile = File(context.cacheDir, "tibansub_signed_tv.wgt")
-                signEmbeddedWgt(context, signingBundle, signedWgtFile)
-
-                onProgress("4/5 กำลังส่งไฟล์ TIBANSUB TV (${signedWgtFile.length() / 1024} KB) เข้าทีวี...")
-                sdb.pushFile(signedWgtFile, REMOTE_WGT_PATH)
-
-                onProgress("5/5 กำลังติดตั้งแอป TIBANSUB TV บนทีวี Samsung (vd_appinstall)...")
-                val installOut = sdb.execShell(
-                    "0 vd_appinstall $TIZEN_PACKAGE_ID $REMOTE_WGT_PATH",
-                    stopOnKeyword = "spend time"
+            // Phase 2: Issue or load Samsung Author + Distributor certificates for this exact DUID
+            onProgress("2/5 พบ DUID ($resolvedDuid) — กำลังเตรียมใบรับรองและเซ็นไฟล์ .wgt...")
+            val signingBundle = resolveSigningBundle(context, resolvedDuid, onProgress)
+                ?: return@withContext Result.failure(
+                    IllegalStateException("ยังไม่มีใบรับรอง Samsung กรุณากด 'ล็อกอิน Samsung' ด้านบนก่อนแล้วกดติดตั้งอีกครั้ง")
                 )
 
-                try { signedWgtFile.delete() } catch (_: Exception) {}
+            signEmbeddedWgt(context, signingBundle, signedWgtFile)
+            val wgtSizeKb = (signedWgtFile.length() / 1024).coerceAtLeast(1)
 
-                val normalizedOut = installOut.lowercase()
-                val hasError = normalizedOut.contains("failed") ||
-                    normalizedOut.contains("error") ||
-                    Regex("\\[-\\d+\\]").containsMatchIn(installOut) ||
-                    normalizedOut.contains("install fail")
-
-                if (!hasError && (normalizedOut.contains("spend time") || normalizedOut.contains("val[ok]") || normalizedOut.contains("ok") || installOut.isBlank())) {
-                    Result.success("ติดตั้งแอป TIBANSUB TV บนทีวี Samsung ($cleanIp) สำเร็จแล้ว เปิดแอปจากหน้า Apps บนทีวีได้เลย")
-                } else {
-                    val hint = when {
-                        installOut.contains("-12") || normalizedOut.contains("cert") || normalizedOut.contains("signature") ->
-                            "ทีวีปฏิเสธใบรับรอง (รหัส -12): กรุณากด 'ล็อกอิน Samsung Account' ใหม่เพื่อให้แอปขอใบรับรองที่ตรงกับ DUID ($resolvedDuid)"
-                        else -> "ติดตั้งไม่สำเร็จ: $installOut"
+            // Phase 3: Push device-profile.xml (if issued) and signed .wgt over clean SDB sync session
+            onProgress("3/5 กำลังส่งไฟล์ TIBANSUB TV ($wgtSizeKb KB) เข้าทีวี Samsung...")
+            SdbSession(cleanIp, timeoutMs = 30000).use { sdb ->
+                sdb.connectHandshake()
+                val distPem = signingBundle.distributorRawPem
+                if (!distPem.isNullOrBlank()) {
+                    val tmpProfile = File(context.cacheDir, "device-profile.xml")
+                    try {
+                        tmpProfile.writeText(distPem, Charsets.UTF_8)
+                        sdb.pushFile(tmpProfile, REMOTE_DEVICE_PROFILE_PATH)
+                    } catch (_: Exception) {
+                        // Optional on newer Tizen versions
+                    } finally {
+                        try { tmpProfile.delete() } catch (_: Exception) {}
                     }
-                    Result.failure(IllegalStateException(hint))
                 }
+            }
+
+            SdbSession(cleanIp, timeoutMs = 45000).use { sdb ->
+                sdb.connectHandshake()
+                sdb.pushFile(signedWgtFile, REMOTE_WGT_PATH)
+            }
+
+            // Phase 4: Execute `0 vd_appinstall` on a brand-new clean SDB connection with 60s timeout
+            onProgress("4/5 ส่งไฟล์ครบแล้ว กำลังติดตั้งลงทีวี Samsung (รอประมาณ 5-15 วินาที)...")
+            val installOut = SdbSession(cleanIp, timeoutMs = 60000).use { sdb ->
+                sdb.connectHandshake()
+                sdb.execShell(
+                    command = "0 vd_appinstall $TIZEN_PACKAGE_ID $REMOTE_WGT_PATH",
+                    stopOnKeyword = "spend time"
+                )
+            }
+
+            val cleanLog = installOut.trim()
+            val normalizedOut = cleanLog.lowercase()
+            val hasExplicitSuccess =
+                normalizedOut.contains("val[ok]") ||
+                    (normalizedOut.contains("spend time") &&
+                        !normalizedOut.contains("fail") &&
+                        !normalizedOut.contains("error") &&
+                        !Regex("\\[-\\d+\\]").containsMatchIn(cleanLog)) ||
+                    normalizedOut.contains("install completed")
+
+            val hasError = normalizedOut.contains("fail") ||
+                normalizedOut.contains("error") ||
+                Regex("\\[-\\d+\\]").containsMatchIn(cleanLog)
+
+            if (hasExplicitSuccess && !hasError) {
+                // Phase 5: Try auto-launching TIBANSUB TV right on the Samsung TV so user sees it immediately!
+                onProgress("5/5 ติดตั้งสำเร็จแล้ว กำลังเปิดแอป TIBANSUB TV บนทีวี...")
+                try {
+                    SdbSession(cleanIp, timeoutMs = 8000).use { sdb ->
+                        sdb.connectHandshake()
+                        sdb.execShell("0 was_execute $TIZEN_APP_ID")
+                    }
+                } catch (_: Exception) {}
+
+                Result.success("ติดตั้งแอป TIBANSUB TV บนทีวี Samsung ($cleanIp) สำเร็จแล้ว เปิดใช้งานได้จากเมนู Apps บนทีวีเลย")
+            } else if (cleanLog.isEmpty()) {
+                Result.failure(
+                    IllegalStateException(
+                        "ทีวีไม่ได้ส่งผลยืนยันการติดตั้งกลับมา (อาจปิด Developer Mode หรือทีวีปฏิเสธการเชื่อมต่อ) กรุณารีสตาร์ททีวี 1 รอบแล้วลองใหม่"
+                    )
+                )
+            } else {
+                val hint = when {
+                    cleanLog.contains("-12") || normalizedOut.contains("cert") || normalizedOut.contains("signature") ->
+                        "ทีวีปฏิเสธใบรับรอง (รหัส -12): กรุณากด 'สลับบัญชี' ล็อกอิน Samsung ใหม่เพื่อให้แอปออกใบรับรองใหม่ตรงกับ DUID ($resolvedDuid)\nรายละเอียดทีวี: $cleanLog"
+                    cleanLog.contains("-14") || normalizedOut.contains("privilege") ->
+                        "ทีวีปฏิเสธสิทธิ์แอป (รหัส -14)\nรายละเอียดทีวี: $cleanLog"
+                    cleanLog.contains("-27") || normalizedOut.contains("not found") ->
+                        "ทีวีหาไฟล์แพ็กเกจไม่เจอ (รหัส -27): กรุณาตรวจว่าพื้นที่ว่างบนทีวีเพียงพอแล้วลองใหม่\nรายละเอียดทีวี: $cleanLog"
+                    else -> "ทีวีติดตั้งไม่สำเร็จ: $cleanLog"
+                }
+                Result.failure(IllegalStateException(hint))
             }
         } catch (e: Exception) {
             Result.failure(
                 IllegalStateException(
-                    "ติดตั้งลงทีวี Samsung ไม่สำเร็จ (${e.message}) — ตรวจสอบว่าเปิด Developer Mode (กด 1-2-3-4-5), กรอก IP มือถือตรงกัน และกดค้างปุ่มปิดทีวีเพื่อรีสตาร์ทแล้ว"
+                    "ติดตั้งลงทีวี Samsung ไม่สำเร็จ: ${e.message}"
                 )
             )
+        } finally {
+            try { signedWgtFile.delete() } catch (_: Exception) {}
         }
     }
 
@@ -411,7 +440,8 @@ object TizenSdbWgtInstaller {
 
     private data class SigningBundle(
         val author: CertIdentity,
-        val distributor: CertIdentity
+        val distributor: CertIdentity,
+        val distributorRawPem: String? = null
     )
 
     private fun resolveSigningBundle(
@@ -419,7 +449,6 @@ object TizenSdbWgtInstaller {
         duid: String,
         onProgress: (String) -> Unit
     ): SigningBundle? {
-        // 1. Check if we already have Samsung-issued certificates cached for THIS exact TV DUID
         val cachedDuid = getIssuedDuid(context)
         val authorKeyFile = File(context.filesDir, ISSUED_AUTHOR_KEY)
         val authorCertFile = File(context.filesDir, ISSUED_AUTHOR_CERT)
@@ -434,21 +463,14 @@ object TizenSdbWgtInstaller {
             } catch (_: Exception) {}
         }
 
-        // 2. If user signed into Samsung Account inside TIBANSUB, issue real official VD Author + Distributor certs for this DUID!
         val session = getSavedSamsungSession(context)
         if (session != null) {
-            onProgress("3/5 กำลังขอใบรับรอง Samsung Developer สำหรับ DUID ($duid)...")
+            onProgress("2/5 กำลังขอใบรับรอง Samsung Developer สำหรับ DUID ($duid)...")
             val issued = issueOfficialSamsungCertificates(context, session, duid)
-            if (issued != null) {
-                return issued
-            }
+            if (issued != null) return issued
         }
 
-        // 3. Fallback: Check user-imported .p12 certificate files
-        val p12Bundle = loadImportedP12Bundle(context)
-        if (p12Bundle != null) return p12Bundle
-
-        return null
+        return loadImportedP12Bundle(context)
     }
 
     private fun loadIssuedCertFiles(
@@ -468,7 +490,8 @@ object TizenSdbWgtInstaller {
 
         return SigningBundle(
             author = CertIdentity(aKey, listOf(stripPemHeaders(aLeafPem), stripPemHeaders(authorCaPem))),
-            distributor = CertIdentity(dKey, listOf(stripPemHeaders(dLeafPem), stripPemHeaders(distCaPem)))
+            distributor = CertIdentity(dKey, listOf(stripPemHeaders(dLeafPem), stripPemHeaders(distCaPem))),
+            distributorRawPem = dLeafPem
         )
     }
 
@@ -486,7 +509,7 @@ object TizenSdbWgtInstaller {
             } else {
                 authorId
             }
-            SigningBundle(authorId, distId)
+            SigningBundle(authorId, distId, null)
         } catch (_: Exception) {
             null
         }
@@ -566,10 +589,9 @@ object TizenSdbWgtInstaller {
         )
 
         if (!authorCertPem.contains("BEGIN CERTIFICATE") || !distCertPem.contains("BEGIN CERTIFICATE")) {
-            throw IllegalStateException("โทเคน Samsung หมดอายุ กรุณากดล็อกอิน Samsung Account ใหม่อีกครั้ง")
+            throw IllegalStateException("โทเคน Samsung หมดอายุ กรุณากด 'สลับบัญชี' ล็อกอิน Samsung ใหม่อีกครั้ง")
         }
 
-        // Persist issued certs for this DUID so future installs are instant
         File(context.filesDir, ISSUED_AUTHOR_KEY).writeBytes(authorKp.private.encoded)
         File(context.filesDir, ISSUED_AUTHOR_CERT).writeText(authorCertPem, Charsets.UTF_8)
         File(context.filesDir, ISSUED_DIST_KEY).writeBytes(distKp.private.encoded)
@@ -590,14 +612,11 @@ object TizenSdbWgtInstaller {
             distributor = CertIdentity(
                 distKp.private,
                 listOf(stripPemHeaders(distCertPem), stripPemHeaders(distCaPem))
-            )
+            ),
+            distributorRawPem = distCertPem
         )
     }
 
-    /**
-     * Scoped HTTPS POST specifically for svdca.samsungqbe.com (whose leaf TLS cert Samsung left expired,
-     * matching TizenBrewInstaller's documented behavior).
-     */
     private fun postMultipartToSamsungCa(
         endpointUrl: String,
         fields: Map<String, String>,
@@ -621,7 +640,6 @@ object TizenSdbWgtInstaller {
 
         val payload = body.toByteArray()
 
-        // Trust manager scoped ONLY to svdca.samsungqbe.com
         val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -664,10 +682,8 @@ object TizenSdbWgtInstaller {
         else -> byteArrayOf(0x83.toByte(), (len shr 16).toByte(), (len shr 8).toByte(), len.toByte())
     }
 
-    private fun derWrap(tag: Int, content: ByteArray): ByteArray {
-        val len = derLength(content.size)
-        return byteArrayOf(tag.toByte()) + len + content
-    }
+    private fun derWrap(tag: Int, content: ByteArray): ByteArray =
+        byteArrayOf(tag.toByte()) + derLength(content.size) + content
 
     private fun derSeq(vararg parts: ByteArray): ByteArray {
         val out = ByteArrayOutputStream()
@@ -707,10 +723,7 @@ object TizenSdbWgtInstaller {
         sanUris: List<String>
     ): String {
         val version = derWrap(0x02, byteArrayOf(0x00))
-
-        // Subject DN
         val rdnParts = ArrayList<ByteArray>()
-        // CN (2.5.4.3)
         rdnParts.add(
             derSet(
                 derSeq(
@@ -719,7 +732,6 @@ object TizenSdbWgtInstaller {
                 )
             )
         )
-        // emailAddress (1.2.840.113549.1.9.1)
         if (!emailAddress.isNullOrBlank()) {
             rdnParts.add(
                 derSet(
@@ -731,15 +743,11 @@ object TizenSdbWgtInstaller {
             )
         }
         val subject = derSeq(*rdnParts.toTypedArray())
-
-        // SubjectPublicKeyInfo (already DER-encoded by Java!)
         val spki = keyPair.public.encoded
 
-        // Attributes [0] IMPLICIT
         val attrs = if (sanUris.isEmpty()) {
             derWrap(0xA0, ByteArray(0))
         } else {
-            // GeneralNames: each URI is [6] IMPLICIT IA5String (tag 0x86)
             val generalNamesContent = ByteArrayOutputStream()
             sanUris.forEach { uri ->
                 generalNamesContent.write(derWrap(0x86, uri.toByteArray(Charsets.US_ASCII)))
@@ -755,17 +763,12 @@ object TizenSdbWgtInstaller {
         }
 
         val certReqInfo = derSeq(version, subject, spki, attrs)
-
-        // Sign CertificationRequestInfo with sha512WithRSAEncryption (1.2.840.113549.1.1.13)
         val sig = Signature.getInstance("SHA512withRSA")
         sig.initSign(keyPair.private)
         sig.update(certReqInfo)
         val sigBytes = sig.sign()
 
-        val sigAlgId = derSeq(
-            derOid(1, 2, 840, 113549, 1, 1, 13),
-            byteArrayOf(0x05, 0x00) // NULL
-        )
+        val sigAlgId = derSeq(derOid(1, 2, 840, 113549, 1, 1, 13), byteArrayOf(0x05, 0x00))
         val csrDer = derSeq(certReqInfo, sigAlgId, derBitString(sigBytes))
         val b64 = wrap76(Base64.encodeToString(csrDer, Base64.NO_WRAP))
         return "-----BEGIN CERTIFICATE REQUEST-----\n$b64\n-----END CERTIFICATE REQUEST-----\n"
@@ -779,13 +782,14 @@ object TizenSdbWgtInstaller {
             ZipInputStream(rawIn).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
+                    val normalizedName = entry.name.replace('\\', '/')
                     if (!entry.isDirectory &&
-                        !entry.name.equals("author-signature.xml", true) &&
-                        !(entry.name.contains("signature", true) && entry.name.endsWith(".xml", true))
+                        !normalizedName.equals("author-signature.xml", true) &&
+                        !(normalizedName.contains("signature", true) && normalizedName.endsWith(".xml", true))
                     ) {
                         val baos = ByteArrayOutputStream()
                         zis.copyTo(baos)
-                        entries[entry.name] = baos.toByteArray()
+                        entries[normalizedName] = baos.toByteArray()
                     }
                     entry = zis.nextEntry
                 }
@@ -849,7 +853,6 @@ object TizenSdbWgtInstaller {
 
         val references = refsSb.toString()
 
-        // Exact Exc-C14N byte-for-byte form matching Samsung packageSigner.js
         val signedInfoForSign = "<SignedInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n" +
             "<CanonicalizationMethod Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"></CanonicalizationMethod>\n" +
             "<SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha512\"></SignatureMethod>\n" +
@@ -910,9 +913,12 @@ object TizenSdbWgtInstaller {
         return sb.toString()
     }
 
-    // ==================== Binary SDB Client over TCP Port 26101 ====================
+    // ==================== Strict Binary SDB Client over TCP Port 26101 ====================
 
-    private class SdbSession(private val ip: String) : AutoCloseable {
+    private class SdbSession(
+        private val ip: String,
+        private val timeoutMs: Int = 30000
+    ) : AutoCloseable {
         private val socket = Socket()
         private lateinit var din: DataInputStream
         private lateinit var dout: DataOutputStream
@@ -920,7 +926,7 @@ object TizenSdbWgtInstaller {
 
         fun connectHandshake() {
             socket.connect(InetSocketAddress(ip, SDB_PORT), 6000)
-            socket.soTimeout = 30000
+            socket.soTimeout = timeoutMs
             din = DataInputStream(socket.getInputStream())
             dout = DataOutputStream(socket.getOutputStream())
 
@@ -938,6 +944,10 @@ object TizenSdbWgtInstaller {
             var remoteId = 0
             while (true) {
                 val pkt = readPacket()
+                if (pkt.arg1 != localId) {
+                    // Ignore any stray packet from an earlier stream
+                    continue
+                }
                 when (pkt.cmd) {
                     CMD_OKAY -> remoteId = pkt.arg0
                     CMD_WRTE -> {
@@ -959,31 +969,31 @@ object TizenSdbWgtInstaller {
         }
 
         /**
-         * Matches TizenBrewInstaller `FilePusher.js` protocol:
-         * STAT -> SEND <path>,33261 -> DATA (1420-byte chunks) -> DONE -> QUIT
+         * SDB `sync:` file transfer that strictly waits for the TV's `OKAY`/`FAIL` commit response after `DONE`.
          */
         fun pushFile(localFile: File, remotePath: String) {
             val localId = nextLocalId++
             sendPacket(CMD_OPEN, localId, 0, "sync:\u0000".toByteArray(Charsets.UTF_8))
-            val openResp = readPacket()
-            if (openResp.cmd != CMD_OKAY) throw IllegalStateException("SDB sync ถูกปฏิเสธ")
-            val remoteId = openResp.arg0
+            var remoteId = 0
+            while (true) {
+                val pkt = readPacket()
+                if (pkt.arg1 != localId) continue
+                if (pkt.cmd == CMD_OKAY) {
+                    remoteId = pkt.arg0
+                    break
+                } else {
+                    throw IllegalStateException("ทีวีปฏิเสธการเปิดช่องส่งไฟล์ SDB sync (${pkt.cmd})")
+                }
+            }
 
-            val pathBytes = remotePath.toByteArray(Charsets.UTF_8)
-            val statHdr = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
-                .put("STAT".toByteArray(Charsets.US_ASCII))
-                .putInt(pathBytes.size)
-                .array()
-            writeSyncChunk(localId, remoteId, statHdr)
-            writeSyncChunk(localId, remoteId, pathBytes)
-
+            // Combine SEND header + spec into a single clean sync packet (and verify no FAIL response)
             val specBytes = "$remotePath,33261".toByteArray(Charsets.UTF_8)
-            val sendHdr = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+            val sendPkt = ByteBuffer.allocate(8 + specBytes.size).order(ByteOrder.LITTLE_ENDIAN)
                 .put("SEND".toByteArray(Charsets.US_ASCII))
                 .putInt(specBytes.size)
+                .put(specBytes)
                 .array()
-            writeSyncChunk(localId, remoteId, sendHdr)
-            writeSyncChunk(localId, remoteId, specBytes)
+            writeSyncChunk(localId, remoteId, sendPkt)
 
             val buf = ByteArray(1420)
             FileInputStream(localFile).use { fis ->
@@ -1004,7 +1014,38 @@ object TizenSdbWgtInstaller {
                 .put("DONE".toByteArray(Charsets.US_ASCII))
                 .putInt(mtime)
                 .array()
-            writeSyncChunk(localId, remoteId, donePkt)
+            sendPacket(CMD_WRTE, localId, remoteId, donePkt)
+
+            // Wait for BOTH transport ACK and the TV sync daemon's actual OKAY/FAIL commit packet!
+            var syncCommitted = false
+            while (!syncCommitted) {
+                val pkt = readPacket()
+                if (pkt.arg1 != localId) continue
+                when (pkt.cmd) {
+                    CMD_OKAY -> { /* transport ack, keep waiting for sync OKAY/FAIL WRTE */ }
+                    CMD_WRTE -> {
+                        sendPacket(CMD_OKAY, localId, pkt.arg0, ByteArray(0))
+                        if (pkt.payload.size >= 4) {
+                            val tag = String(pkt.payload, 0, 4, Charsets.US_ASCII)
+                            if (tag == "FAIL") {
+                                val reason = if (pkt.payload.size > 8) {
+                                    String(pkt.payload, 8, pkt.payload.size - 8, Charsets.UTF_8)
+                                } else "sync FAIL"
+                                throw IllegalStateException("ทีวีปฏิเสธการรับไฟล์ที่ $remotePath ($reason)")
+                            }
+                            if (tag == "OKAY") {
+                                syncCommitted = true
+                            }
+                        } else {
+                            syncCommitted = true
+                        }
+                    }
+                    CMD_CLSE -> {
+                        sendPacket(CMD_CLSE, localId, remoteId, ByteArray(0))
+                        syncCommitted = true
+                    }
+                }
+            }
 
             val quitPkt = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
                 .put("QUIT".toByteArray(Charsets.US_ASCII))
@@ -1012,8 +1053,6 @@ object TizenSdbWgtInstaller {
                 .array()
             try {
                 sendPacket(CMD_WRTE, localId, remoteId, quitPkt)
-            } catch (_: Exception) {}
-            try {
                 sendPacket(CMD_CLSE, localId, remoteId, ByteArray(0))
             } catch (_: Exception) {}
         }
@@ -1022,13 +1061,19 @@ object TizenSdbWgtInstaller {
             sendPacket(CMD_WRTE, localId, remoteId, data)
             while (true) {
                 val pkt = readPacket()
+                if (pkt.arg1 != localId) continue
                 when (pkt.cmd) {
                     CMD_OKAY -> return
                     CMD_WRTE -> {
-                        // Drain any STAT response packet sent back by TV sync daemon
                         sendPacket(CMD_OKAY, localId, pkt.arg0, ByteArray(0))
+                        if (pkt.payload.size >= 4 && String(pkt.payload, 0, 4, Charsets.US_ASCII) == "FAIL") {
+                            val reason = if (pkt.payload.size > 8) {
+                                String(pkt.payload, 8, pkt.payload.size - 8, Charsets.UTF_8)
+                            } else "sync FAIL"
+                            throw IllegalStateException("ส่งไฟล์เข้าทีวีไม่สำเร็จ ($reason)")
+                        }
                     }
-                    else -> throw IllegalStateException("การส่งไฟล์ผ่าน SDB sync ขัดข้อง (${pkt.cmd})")
+                    CMD_CLSE -> throw IllegalStateException("ทีวีตัดการเชื่อมต่อระหว่างส่งไฟล์ (CMD_CLSE)")
                 }
             }
         }
