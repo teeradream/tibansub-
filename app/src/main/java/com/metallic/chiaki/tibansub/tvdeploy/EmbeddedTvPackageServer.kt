@@ -54,36 +54,36 @@ class EmbeddedTvPackageServer(private val context: Context) {
                             val ip = "$prefix.$hostNum"
                             if (ip == myIp) return@async
 
-                            val sdbOpen = isPortOpen(ip, 26101, 240)
                             val samRestOpen = isPortOpen(ip, 8001, 240)
-                            val adbOpen = isPortOpen(ip, 5555, 240)
+                            val adbOpen = if (!samRestOpen) isPortOpen(ip, 5555, 240) else false
 
-                            if (sdbOpen || samRestOpen) {
+                            if (samRestOpen) {
                                 var tvName = "Samsung Smart TV ($ip)"
                                 var duid: String? = null
-                                if (samRestOpen) {
-                                    try {
-                                        val conn = (URL("http://$ip:8001/api/v2/").openConnection() as HttpURLConnection).apply {
-                                            connectTimeout = 500
-                                            readTimeout = 500
-                                        }
-                                        if (conn.responseCode in 200..299) {
-                                            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-                                            val dev = json.optJSONObject("device")
-                                            val n = dev?.optString("name", "") ?: json.optString("name", "")
-                                            if (n.isNotBlank()) tvName = n
-                                            val rawId = dev?.optString("duid", "") ?: ""
-                                            if (rawId.isNotBlank()) duid = rawId.removePrefix("uuid:")
-                                        }
-                                        conn.disconnect()
-                                    } catch (_: Exception) {}
-                                }
+                                var devModeOn = false
+                                try {
+                                    val conn = (URL("http://$ip:8001/api/v2/").openConnection() as HttpURLConnection).apply {
+                                        connectTimeout = 500
+                                        readTimeout = 500
+                                    }
+                                    if (conn.responseCode in 200..299) {
+                                        val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                                        val dev = json.optJSONObject("device")
+                                        val n = dev?.optString("name", "") ?: json.optString("name", "")
+                                        if (n.isNotBlank()) tvName = n
+                                        val rawId = dev?.optString("duid", "") ?: ""
+                                        if (rawId.isNotBlank()) duid = rawId.removePrefix("uuid:")
+                                        val devModeStr = dev?.optString("developerMode", "") ?: ""
+                                        devModeOn = devModeStr == "1"
+                                    }
+                                    conn.disconnect()
+                                } catch (_: Exception) {}
                                 found.add(
                                     DiscoveredSmartTv(
                                         ip = ip,
                                         name = tvName,
                                         isSamsungTizen = true,
-                                        sdbDevPortOpen = sdbOpen,
+                                        sdbDevPortOpen = devModeOn,
                                         adbPortOpen = false,
                                         knownDuid = duid
                                     )

@@ -650,10 +650,12 @@ private fun SamsungCertSignInWebDialog(
                         }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
                         settings.javaScriptCanOpenWindowsAutomatically = true
-                        settings.userAgentString = settings.userAgentString
-                            .replace("; wv", "")
-                            .replace("Version/4.0 ", "")
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.userAgentString =
+                            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                            "Chrome/126.0.0.0 Mobile Safari/537.36"
                         webViewClient = WebViewClient()
                         loadUrl(TizenSdbWgtInstaller.SAMSUNG_OAUTH_LOGIN_URL)
                     }
