@@ -272,6 +272,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	private val subtitleHistory = mutableListOf<SubtitleHistoryItem>()
 	private var maxHistoryLines = 3
 	private var currentSubTextColor = Color.parseColor("#00FF88")
+	private var currentSpeakerColorMode = "SAME" // "SAME", "CUSTOM", "AUTO"
+	private var currentSpeakerCustomColor = Color.parseColor("#FFD700")
 	private var currentSubFontSize = 26
 	private var currentSubPosition = "BOTTOM"
 	private var currentSubVerticalPercent = 15
@@ -399,6 +401,13 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			Color.parseColor(cropPrefs.getString("sub_text_color", "#00FF88") ?: "#00FF88")
 		} catch (_: Exception) {
 			Color.parseColor("#00FF88")
+		}
+		currentSpeakerColorMode = cropPrefs.getString("sub_speaker_color_mode", "SAME") ?: "SAME"
+		if (currentSpeakerColorMode !in listOf("SAME", "CUSTOM", "AUTO")) currentSpeakerColorMode = "SAME"
+		currentSpeakerCustomColor = try {
+			Color.parseColor(cropPrefs.getString("sub_speaker_custom_color", "#FFD700") ?: "#FFD700")
+		} catch (_: Exception) {
+			Color.parseColor("#FFD700")
 		}
 		currentSubFontSize = cropPrefs.getInt("sub_font_size_sp", 26).coerceIn(MIN_SUB_FONT_SIZE, MAX_SUB_FONT_SIZE)
 		currentSubPosition = cropPrefs.getString("sub_position", "BOTTOM") ?: "BOTTOM"
@@ -971,6 +980,50 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			}
 		}
 
+		// 2b. Speaker / Character Name Color Mode ("SAME" / "CUSTOM" / "AUTO")
+		when (currentSpeakerColorMode) {
+			"CUSTOM" -> binding.speakerColorModeToggleGroup.check(R.id.btnSpeakerModeCustom)
+			"AUTO" -> binding.speakerColorModeToggleGroup.check(R.id.btnSpeakerModeAuto)
+			else -> binding.speakerColorModeToggleGroup.check(R.id.btnSpeakerModeSame)
+		}
+		binding.speakerCustomColorScroll.isVisible = (currentSpeakerColorMode == "CUSTOM")
+		binding.speakerColorModeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+			if (isChecked) {
+				currentSpeakerColorMode = when (checkedId) {
+					R.id.btnSpeakerModeCustom -> "CUSTOM"
+					R.id.btnSpeakerModeAuto -> "AUTO"
+					else -> "SAME"
+				}
+				binding.speakerCustomColorScroll.isVisible = (currentSpeakerColorMode == "CUSTOM")
+				cropPrefs.edit().putString("sub_speaker_color_mode", currentSpeakerColorMode).apply()
+				renderSubtitles()
+			}
+		}
+
+		when (currentSpeakerCustomColor) {
+			Color.parseColor("#00E5FF") -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorCyan)
+			Color.parseColor("#FF66B2") -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorPink)
+			Color.parseColor("#00FF88") -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorGreen)
+			Color.parseColor("#FF9100") -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorOrange)
+			Color.parseColor("#FFFFFF") -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorWhite)
+			else -> binding.speakerCustomColorToggleGroup.check(R.id.btnSpeakerColorYellow)
+		}
+		binding.speakerCustomColorToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+			if (isChecked) {
+				currentSpeakerCustomColor = when (checkedId) {
+					R.id.btnSpeakerColorCyan -> Color.parseColor("#00E5FF")
+					R.id.btnSpeakerColorPink -> Color.parseColor("#FF66B2")
+					R.id.btnSpeakerColorGreen -> Color.parseColor("#00FF88")
+					R.id.btnSpeakerColorOrange -> Color.parseColor("#FF9100")
+					R.id.btnSpeakerColorWhite -> Color.parseColor("#FFFFFF")
+					else -> Color.parseColor("#FFD700")
+				}
+				val hexColor = String.format("#%06X", 0xFFFFFF and currentSpeakerCustomColor)
+				cropPrefs.edit().putString("sub_speaker_custom_color", hexColor).apply()
+				renderSubtitles()
+			}
+		}
+
 		// 3. Font Size Presets, Stepper & Slider
 		syncFontSizeToggleState()
 		binding.fontSizeToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -1469,7 +1522,9 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			popupRightText = if (showRight) lastPopupRightThai else null,
 			popupLeftVerticalPercent = popupLeftVerticalPercent,
 			popupRightVerticalPercent = popupRightVerticalPercent,
-			noteText = if (showNote) lastNoteThai else null
+			noteText = if (showNote) lastNoteThai else null,
+			speakerColorMode = currentSpeakerColorMode,
+			speakerCustomColorHex = String.format("#%06X", 0xFFFFFF and currentSpeakerCustomColor)
 		)
 	}
 
@@ -1593,6 +1648,54 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		updateGeminiApiStatusUI()
 	}
 
+	private fun resolveAutoSpeakerColor(speakerName: String): Int {
+		val key = speakerName.trim().lowercase()
+		val knownHex = when {
+			key.startsWith("เจสัน") || key.startsWith("jason") -> "#00E5FF"
+			key.startsWith("ลูเซีย") || key.startsWith("lucia") -> "#FF66B2"
+			key.startsWith("ไบรอัน") || key.startsWith("brian") -> "#FFD700"
+			key.startsWith("แคล") || key.startsWith("cal") -> "#FF9100"
+			key.startsWith("สเตฟานี") || key.startsWith("stefanie") -> "#B388FF"
+			key.startsWith("ราอูล") || key.startsWith("raul") -> "#69F0AE"
+			key.startsWith("บูบี") || key.startsWith("boobie") -> "#FF6E6E"
+			key.startsWith("เดรควอน") || key.startsWith("dre'quan") || key.startsWith("drequan") -> "#40C4FF"
+			key.contains("ตำรวจ") || key.contains("police") || key.contains("cop") || key.contains("officer") -> "#5C9DFF"
+			else -> null
+		}
+		if (knownHex != null) return Color.parseColor(knownHex)
+
+		val palette = arrayOf("#FFD700", "#00E5FF", "#FF66B2", "#FF9100", "#B388FF", "#69F0AE", "#FF6E6E", "#FFF176")
+		var hash = 2166136261L
+		for (ch in key) {
+			hash = hash xor ch.code.toLong()
+			hash = (hash * 16777619L) and 0xFFFFFFFFL
+		}
+		return Color.parseColor(palette[(hash % palette.size).toInt()])
+	}
+
+	private fun formatSubtitleWithSpeakerColor(thaiText: String): CharSequence {
+		if (currentSpeakerColorMode == "SAME" || thaiText.isEmpty()) return thaiText
+		val colonIdx = thaiText.indexOf(':')
+		if (colonIdx <= 0 || colonIdx > 28) return thaiText
+		val speaker = thaiText.substring(0, colonIdx).trim()
+		val body = thaiText.substring(colonIdx + 1).trim()
+		if (speaker.isEmpty() || body.isEmpty() || speaker.split(Regex("\\s+")).size > 3) return thaiText
+
+		val speakerColor = if (currentSpeakerColorMode == "AUTO") {
+			resolveAutoSpeakerColor(speaker)
+		} else {
+			currentSpeakerCustomColor
+		}
+		val ssb = android.text.SpannableStringBuilder(thaiText)
+		ssb.setSpan(
+			android.text.style.ForegroundColorSpan(speakerColor),
+			0,
+			colonIdx + 1,
+			android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+		)
+		return ssb
+	}
+
 	private fun renderSubtitles() {
 		if (subtitleHistory.isEmpty()) {
 			binding.subtitleOverlayContainer.isVisible = false
@@ -1607,23 +1710,25 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// Slot 0 (Newest)
 		val item0 = subtitleHistory.getOrNull(0)
 		if (item0 != null) {
-			binding.translatedSubText.text = item0.thai
+			val styled0 = formatSubtitleWithSpeakerColor(item0.thai)
+			binding.translatedSubText.text = styled0
 			binding.originalSubText.text = item0.english
 			binding.layoutSubItem0.alpha = 1.0f
 
-			binding.pureFullscreenText.text = item0.thai
+			binding.pureFullscreenText.text = styled0
 			binding.pureOriginalText.text = item0.english
 		}
 
 		// Slot 1 (Previous 1, faded 0.65)
 		val item1 = subtitleHistory.getOrNull(1)
 		if (item1 != null && maxHistoryLines >= 2) {
+			val styled1 = formatSubtitleWithSpeakerColor(item1.thai)
 			binding.layoutSubItem1.isVisible = true
-			binding.translatedSubText1.text = item1.thai
+			binding.translatedSubText1.text = styled1
 			binding.originalSubText1.text = item1.english
 			binding.layoutSubItem1.alpha = 0.65f
 
-			binding.pureFullscreenText1.text = item1.thai
+			binding.pureFullscreenText1.text = styled1
 			binding.pureFullscreenText1.isVisible = true
 		} else {
 			binding.layoutSubItem1.isVisible = false
@@ -1633,12 +1738,13 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// Slot 2 (Previous 2, faded 0.35)
 		val item2 = subtitleHistory.getOrNull(2)
 		if (item2 != null && maxHistoryLines >= 3) {
+			val styled2 = formatSubtitleWithSpeakerColor(item2.thai)
 			binding.layoutSubItem2.isVisible = true
-			binding.translatedSubText2.text = item2.thai
+			binding.translatedSubText2.text = styled2
 			binding.originalSubText2.text = item2.english
 			binding.layoutSubItem2.alpha = 0.35f
 
-			binding.pureFullscreenText2.text = item2.thai
+			binding.pureFullscreenText2.text = styled2
 			binding.pureFullscreenText2.isVisible = true
 		} else {
 			binding.layoutSubItem2.isVisible = false

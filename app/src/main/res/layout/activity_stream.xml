@@ -1745,6 +1745,166 @@
                             </com.google.android.material.button.MaterialButtonToggleGroup>
                         </HorizontalScrollView>
 
+                        <!-- Character / Speaker Name Color Mode -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="สีชื่อตัวละคร (หน้าเครื่องหมาย :):"
+                            android:textColor="#FF9A4A"
+                            android:textSize="12sp"
+                            android:layout_marginBottom="4dp"/>
+
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="none"
+                            android:layout_marginBottom="6dp">
+
+                            <com.google.android.material.button.MaterialButtonToggleGroup
+                                android:id="@+id/speakerColorModeToggleGroup"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:singleSelection="true"
+                                app:selectionRequired="true"
+                                app:checkedButton="@id/btnSpeakerModeSame">
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerModeSame"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="สีเดียวกับซับ"
+                                    android:textColor="#FFFFFF"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerModeCustom"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="กำหนดสีเอง"
+                                    android:textColor="#FFD700"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerModeAuto"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="แยกสีอัตโนมัติ"
+                                    android:textColor="#00E5FF"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+                            </com.google.android.material.button.MaterialButtonToggleGroup>
+                        </HorizontalScrollView>
+
+                        <HorizontalScrollView
+                            android:id="@+id/speakerCustomColorScroll"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:scrollbars="none"
+                            android:visibility="gone"
+                            android:layout_marginBottom="10dp">
+
+                            <com.google.android.material.button.MaterialButtonToggleGroup
+                                android:id="@+id/speakerCustomColorToggleGroup"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:singleSelection="true"
+                                app:selectionRequired="true"
+                                app:checkedButton="@id/btnSpeakerColorYellow">
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorYellow"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="เหลืองทอง"
+                                    android:textColor="#FFD700"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorCyan"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ฟ้า"
+                                    android:textColor="#00E5FF"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorPink"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ชมพู"
+                                    android:textColor="#FF66B2"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorGreen"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="เขียวนีออน"
+                                    android:textColor="#00FF88"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorOrange"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ส้ม"
+                                    android:textColor="#FF9100"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+
+                                <com.google.android.material.button.MaterialButton
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:id="@+id/btnSpeakerColorWhite"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ขาว"
+                                    android:textColor="#FFFFFF"
+                                    android:textStyle="bold"
+                                    android:textSize="11sp"
+                                    app:backgroundTint="@color/toggle_btn_bg_tint"
+                                    app:strokeColor="@color/toggle_btn_stroke_color"
+                                    app:strokeWidth="1.5dp"/>
+                            </com.google.android.material.button.MaterialButtonToggleGroup>
+                        </HorizontalScrollView>
+
                         <!-- Subtitle Font Size Selection -->
                         <LinearLayout
                             android:layout_width="match_parent"

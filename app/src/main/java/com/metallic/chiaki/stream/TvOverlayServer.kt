@@ -127,7 +127,9 @@ class TvOverlayServer(
 		popupRightText: String?,
 		popupLeftVerticalPercent: Int,
 		popupRightVerticalPercent: Int,
-		noteText: String?
+		noteText: String?,
+		speakerColorMode: String = "SAME",
+		speakerCustomColorHex: String = "#FFD700"
 	) {
 		val seq = ++stateSeq
 		val colorHex = String.format("#%06X", 0xFFFFFF and textColorInt)
@@ -148,6 +150,8 @@ class TvOverlayServer(
 			put("overlays", isTvCastEnabled)
 			put("fontSizeSp", fontSizeSp)
 			put("textColor", colorHex)
+			put("speakerColorMode", speakerColorMode)
+			put("speakerCustomColor", speakerCustomColorHex)
 			put("bgOpacity", bgOpacityPercent)
 			put("subBgEnabled", subBgEnabled)
 			put("position", position)
@@ -575,6 +579,50 @@ private const val TV_OVERLAY_HTML = """<!DOCTYPE html>
     x.send(null);
   }
 
+  function resolveAutoSpeakerColor(name) {
+    var k = String(name || '').trim().toLowerCase();
+    if (k.indexOf('เจสัน') === 0 || k.indexOf('jason') === 0) return '#00E5FF';
+    if (k.indexOf('ลูเซีย') === 0 || k.indexOf('lucia') === 0) return '#FF66B2';
+    if (k.indexOf('ไบรอัน') === 0 || k.indexOf('brian') === 0) return '#FFD700';
+    if (k.indexOf('แคล') === 0 || k.indexOf('cal') === 0) return '#FF9100';
+    if (k.indexOf('สเตฟานี') === 0 || k.indexOf('stefanie') === 0) return '#B388FF';
+    if (k.indexOf('ราอูล') === 0 || k.indexOf('raul') === 0) return '#69F0AE';
+    if (k.indexOf('บูบี') === 0 || k.indexOf('boobie') === 0) return '#FF6E6E';
+    if (k.indexOf('เดรควอน') === 0 || k.indexOf("dre'quan") === 0 || k.indexOf('drequan') === 0) return '#40C4FF';
+    if (k.indexOf('ตำรวจ') !== -1 || k.indexOf('police') !== -1 || k.indexOf('cop') !== -1 || k.indexOf('officer') !== -1) return '#5C9DFF';
+    var palette = ['#FFD700', '#00E5FF', '#FF66B2', '#FF9100', '#B388FF', '#69F0AE', '#FF6E6E', '#FFF176'];
+    var h = 2166136261;
+    for (var i = 0; i < k.length; i++) {
+      h = (h ^ k.charCodeAt(i)) >>> 0;
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return palette[h % palette.length];
+  }
+
+  function renderSubLine(el, text, mode, customColor) {
+    var str = text || '';
+    if (!mode || mode === 'SAME') {
+      el.textContent = str;
+      return;
+    }
+    var idx = str.indexOf(':');
+    if (idx > 0 && idx <= 28) {
+      var pre = str.slice(0, idx).trim();
+      var bod = str.slice(idx + 1).trim();
+      if (pre && bod && pre.split(/\s+/).length <= 3) {
+        var spColor = (mode === 'AUTO') ? resolveAutoSpeakerColor(pre) : (customColor || '#FFD700');
+        el.textContent = '';
+        var span = document.createElement('span');
+        span.style.color = spColor;
+        span.textContent = str.slice(0, idx + 1);
+        el.appendChild(span);
+        el.appendChild(document.createTextNode(str.slice(idx + 1)));
+        return;
+      }
+    }
+    el.textContent = str;
+  }
+
   function render(s) {
     if (!s.overlays) {
       subBox.style.display = 'none';
@@ -587,6 +635,8 @@ private const val TV_OVERLAY_HTML = """<!DOCTYPE html>
     // Scale mobile sp to 1080p TV px nicely (e.g. 26sp -> ~40px on TV)
     var basePx = Math.round((s.fontSizeSp || 26) * 1.55);
     var color = s.textColor || '#00FF88';
+    var spMode = s.speakerColorMode || 'SAME';
+    var spCustom = s.speakerCustomColor || '#FFD700';
     var bgEnabled = (s.subBgEnabled !== undefined) ? !!s.subBgEnabled : true;
     var alpha = bgEnabled ? (Math.max(0, Math.min(100, s.bgOpacity !== undefined ? s.bgOpacity : 80)) / 100.0) : 0;
 
@@ -605,13 +655,13 @@ private const val TV_OVERLAY_HTML = """<!DOCTYPE html>
       subBox.style.display = 'none';
     } else {
       subBox.style.display = 'inline-block';
-      sub0.textContent = subs[0].th || '';
+      renderSubLine(sub0, subs[0].th || '', spMode, spCustom);
       sub0.style.color = color;
       sub0.style.fontSize = basePx + 'px';
 
       if (subs.length >= 2 && (s.maxLines || 3) >= 2) {
         sub1.style.display = 'block';
-        sub1.textContent = subs[1].th || '';
+        renderSubLine(sub1, subs[1].th || '', spMode, spCustom);
         sub1.style.color = color;
         sub1.style.fontSize = Math.round(basePx * 0.86) + 'px';
       } else {
@@ -620,7 +670,7 @@ private const val TV_OVERLAY_HTML = """<!DOCTYPE html>
 
       if (subs.length >= 3 && (s.maxLines || 3) >= 3) {
         sub2.style.display = 'block';
-        sub2.textContent = subs[2].th || '';
+        renderSubLine(sub2, subs[2].th || '', spMode, spCustom);
         sub2.style.color = color;
         sub2.style.fontSize = Math.round(basePx * 0.76) + 'px';
       } else {
